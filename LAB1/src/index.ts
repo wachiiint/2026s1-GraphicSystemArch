@@ -6,6 +6,7 @@ import { exportProject } from './exportProject';
 import { FPSCounter } from './FPSCounter';
 import { loadProjectFromRepo } from './github/loadProject';
 import { InputController } from './InputController';
+import { loadLocalProject } from './localProject';
 import { HDLModuleDef } from './sim/hdltypes';
 import { HDLModuleWASM } from './sim/hdlwasm';
 import {
@@ -27,7 +28,12 @@ self.MonacoEnvironment = {
   getWorker: () => new editorWorker(),
 };
 
-let currentProject = structuredClone(examples[0]);
+// The local code/ directory (if it has Verilog files) becomes the first preset
+// and the default project when the page opens without ?repo or ?preset.
+const localProject = await loadLocalProject();
+const allExamples = localProject ? [localProject, ...examples] : examples;
+
+let currentProject = structuredClone(allExamples[0]);
 
 const params = new URLSearchParams(window.location.search);
 const repoParam = params.get('repo');
@@ -46,7 +52,7 @@ if (repoParam) {
     repoError = e instanceof Error ? e.message : String(e);
   }
 } else if (presetParam) {
-  const match = examples.find((ex) => ex.id === presetParam);
+  const match = allExamples.find((ex) => ex.id === presetParam);
   if (match) {
     currentProject = structuredClone(match);
   }
@@ -252,8 +258,8 @@ requestAnimationFrame(animationFrame);
 
 const presetBar = initPresetBar({
   container: document.querySelector('#preset-buttons')!,
-  examples,
-  initialPreset: !repoParam ? presetParam ?? examples[0].id : undefined,
+  examples: allExamples,
+  initialPreset: !repoParam ? presetParam ?? allExamples[0].id : undefined,
   onSelect: (example) => {
     currentProject = structuredClone(example);
     const first = Object.keys(currentProject.sources)[0];
