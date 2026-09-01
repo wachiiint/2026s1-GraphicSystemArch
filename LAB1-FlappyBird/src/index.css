@@ -1,0 +1,118 @@
+@import './ui/controls.css';
+@import './ui/error-overlay.css';
+@import './ui/file-tabs.css';
+@import './ui/preset-bar.css';
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: clip;
+  font-family: system-ui, sans-serif;
+}
+
+header {
+  position: relative;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  font-size: 20px;
+  padding: 0 8px;
+  background: #de3f89;
+  color: white;
+  flex-shrink: 0;
+}
+
+.flex-spacer {
+  flex: 1;
+}
+
+main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  background-color: black;
+}
+
+#editor-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  width: 50%;
+}
+
+#code-editor {
+  flex: 1;
+  min-height: 200px;
+  overflow: hidden;
+}
+
+#vga-canvas-container {
+  max-width: 50%;
+}
+
+.canvas-wrapper {
+  position: relative;
+}
+
+#vga-canvas {
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.status-bar {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  padding: 4px 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+#audio-latency-display {
+  color: grey;
+}
+
+#fps-display {
+  color: white;
+}
+
+@media (max-width: 799px) {
+  main {
+    flex-direction: column;
+  }
+
+  #vga-canvas-container {
+    max-width: 100%;
+    order: -1;
+  }
+
+  #vga-canvas {
+    max-height: 40vh;
+  }
+
+  #editor-panel {
+    flex: 1;
+    width: 100%;
+    min-height: 150px;
+  }
+
+  #code-editor {
+    min-height: 0;
+  }
+
+  .header-title {
+    font-size: 14px;
+  }
+
+  #input-values {
+    flex-wrap: wrap;
+  }
+
+  .input-actions {
+    margin-left: 0;
+  }
+}

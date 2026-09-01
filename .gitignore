@@ -1,0 +1,11 @@
+# Dependencies (all sub-projects)
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
