@@ -70,7 +70,11 @@ module tt_um_vga_example (
       .l(inp_l),
       .r(inp_r)
   );
-
+  
+  localparam _G = 10'd3;
+  localparam _accFlap = 10'd8;
+  localparam _accPipe = 10'd1; //1 per ? frame -> See below
+  localparam _initVelPipe = 10'd4;
 
   reg [9:0] counter;
 
@@ -83,16 +87,12 @@ module tt_um_vga_example (
     .hpos(pix_x),
     .vpos(pix_y)
   );
-  
-  wire [9:0] moving_x = pix_x + counter;
 
   reg [9:0] bird_x, bird_y;
   reg [9:0] pipe1_x, pipe1_y;
   reg [9:0] pipe2_x, pipe2_y;
 
-  reg [9:0] acc, acc_pipe, vel_bird, vel_pipe;
-  
-  
+  reg [9:0] vel_bird, vel_pipe;
   
   wire bird = (pix_x > bird_x && pix_x < bird_x + 30 
               && pix_y > bird_y && pix_y < bird_y + 20);
@@ -111,28 +111,12 @@ module tt_um_vga_example (
   
 
   always @(*) begin
-    R = 2'b01;
-    G = 2'b10;
-    B = 2'b11;
-    if (bird && video_active) begin
-      R = 2'b11;
-      G = 2'b11;
-      B = 2'b00;
-    end 
-    if ((pipe1_vertical && !pipe1_horizontal) && video_active) begin
-      R = 2'b00;
-      G = 2'b11;
-      B = 2'b00;
-    end
-    if ((pipe2_vertical && !pipe2_horizontal) && video_active) begin
-      R = 2'b00;
-      G = 2'b11;
-      B = 2'b00;
-    end
-
+    {R,G,B} = 6'b000000;
+    if (video_active) {R,G,B} = 6'b011011;
+    if (bird && video_active) {R,G,B} = 6'b111100;
+    if ((pipe1_vertical && !pipe1_horizontal) && video_active) {R,G,B} = 6'b001100;
+    if ((pipe2_vertical && !pipe2_horizontal) && video_active) {R,G,B} = 6'b001100;
   end
-
-
 
   typedef enum logic [1:0] {
         STOP = 2'b00,
@@ -154,72 +138,49 @@ always @(posedge vsync, negedge rst_n) begin
       pipe2_x          <= 10'd550;
       pipe1_y          <= 10'd100;
       pipe2_y          <= 10'd200;
-      vel_bird              <= 10'd0;
-      vel_pipe              <= 10'd2;
-      acc_pipe        <= 10'd1;
-      acc              <= 10'd3;    
+      vel_bird         <= 10'd0;
+      vel_pipe         <= _initVelPipe;
       last_frame_is_up <= 1'b0;
       currState        <= STOP;
-      
     end else begin
       case (currState)
         STOP: begin
-       
           bird_y <= 10'd200;
           vel_bird    <= 10'd0;
-          pipe1_x          <= 10'd250;
-          pipe2_x          <= 10'd550;
-          pipe1_y          <= 10'd100;
-          pipe2_y          <= 10'd200;
-          vel_pipe    <= 10'd2;
-
-          if (any_button) begin
-            currState <= PLAYING;  
-          end
+          pipe1_x     <= 10'd250;
+          pipe2_x     <= 10'd550;
+          pipe1_y     <= 10'd100;
+          pipe2_y     <= 10'd200;
+          vel_pipe    <= _initVelPipe;
+          if (any_button) currState <= PLAYING;  
         end
 
         PLAYING: begin
 
-          if (bird_y > 10'd450 || bird_collide_pipe) begin
+          if (bird_y > 10'd450 || bird_collide_pipe)
             currState <= STOP;     
-          end
 
           counter          <= counter + 1'b1;
           last_frame_is_up <= inp_up;    
 
-   
-          if (inp_up && !last_frame_is_up) begin
-            vel_bird <= -10'd10;            
-          end 
-       
-          if (counter[1:0] == 2'b00) begin
-            vel_bird <= vel_bird + acc;          
-          end
-
-          if (counter[3:0] == 4'b0000) begin
-            vel_pipe <= vel_pipe + acc_pipe;
-          end
+          // GRAVITY
+          if (inp_up && !last_frame_is_up) //already debounce ?
+            vel_bird <= -_accFlap; // top < bottom (Row domain)
+          // ACCELERATION
+          if (counter[1:0] == 0) // 1 per 4 frame
+            vel_bird <= vel_bird + _G; // bottom > top (Row domain)
+          if (counter[5:0] == 0) // 1 per 64 frame
+            vel_pipe <= vel_pipe + _accPipe;
           
-
-          if (pipe1_x <= vel_pipe)
-            pipe1_x <= 10'd690;  
-          else
-            pipe1_x <= pipe1_x - vel_pipe;
-
-          if (pipe2_x <= vel_pipe)
-            pipe2_x <= 10'd690;
-          else
-            pipe2_x <= pipe2_x - vel_pipe;
-
-
-          bird_y <= bird_y + vel_bird;  
+          // update position pipe + bird
+          pipe1_x <= pipe1_x <= vel_pipe ? 10'd690: pipe1_x - vel_pipe;
+          pipe2_x <= pipe2_x <= vel_pipe ? 10'd690: pipe2_x - vel_pipe;
+          bird_y <= bird_y + vel_bird; 
         end
 
         default: currState <= STOP;
       endcase
     end
   end
-
-  wire _unused_ok_ = &{moving_x, pix_y};
 
 endmodule
