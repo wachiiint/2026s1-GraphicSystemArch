@@ -36,16 +36,6 @@ module tt_um_vga_example (
   // Tiny VGA Pmod
   assign uo_out = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
 
-  hvsync_generator vga_sync_gen (
-      .clk(clk),
-      .reset(~rst_n),
-      .hsync(hsync),
-      .vsync(vsync),
-      .display_on(video_active),
-      .hpos(pix_x),
-      .vpos(pix_y)
-  );
-
   // Gamepad Pmod
   wire inp_b, inp_y, inp_select, inp_start, inp_up, inp_down, inp_left, inp_right, inp_a, inp_x, inp_l, inp_r;
 
@@ -163,7 +153,8 @@ always @(posedge vsync, negedge rst_n) begin
           if (inp_up && !last_frame_is_up) //already debounce ?
             vel_bird <= -_VelImpulseFlap; // top < bottom (Row domain)
           // ACCELERATION
-          if (counter[1:0] == 0) // 1 per 4 frame
+          // THIS IS THE BUG, Real Hardware Implement can overwrite -> put else if here
+          else if (counter[1:0] == 0) // 1 per 4 frame
             vel_bird <= vel_bird + _G; // bottom > top (Row domain)
           if (counter[5:0] == 0) // 1 per 64 frame
             vel_pipe <= vel_pipe + _accPipe;
