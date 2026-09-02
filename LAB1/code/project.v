@@ -72,7 +72,7 @@ module tt_um_vga_example (
   );
   
   localparam _G = 10'd3;
-  localparam _accFlap = 10'd8;
+  localparam _VelImpulseFlap = 10'd8;
   localparam _accPipe = 10'd1; //1 per ? frame -> See below
   localparam _initVelPipe = 10'd4;
 
@@ -118,16 +118,12 @@ module tt_um_vga_example (
     if ((pipe2_vertical && !pipe2_horizontal) && video_active) {R,G,B} = 6'b001100;
   end
 
-  typedef enum logic [1:0] {
-        STOP = 2'b00,
-        PLAYING = 2'b01
-  } state;
+  localparam STOP = 2'd00;
+  localparam PLAYING = 2'd01;
+  reg [1:0] currState;
 
   reg last_frame_is_up = 0;
-  state currState = STOP;
   wire any_button = inp_b || inp_y || inp_select || inp_start || inp_up || inp_down || inp_left || inp_right ||  inp_a || inp_x ||  inp_l || inp_r;
-
-  
 
 always @(posedge vsync, negedge rst_n) begin
     if (~rst_n) begin
@@ -165,7 +161,7 @@ always @(posedge vsync, negedge rst_n) begin
 
           // GRAVITY
           if (inp_up && !last_frame_is_up) //already debounce ?
-            vel_bird <= -_accFlap; // top < bottom (Row domain)
+            vel_bird <= -_VelImpulseFlap; // top < bottom (Row domain)
           // ACCELERATION
           if (counter[1:0] == 0) // 1 per 4 frame
             vel_bird <= vel_bird + _G; // bottom > top (Row domain)
