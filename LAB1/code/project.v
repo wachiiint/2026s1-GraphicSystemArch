@@ -160,8 +160,19 @@ always @(posedge vsync, negedge rst_n) begin
             vel_pipe <= vel_pipe + _accPipe;
           
           // update position pipe + bird
-          pipe1_x <= pipe1_x <= vel_pipe ? 10'd690: pipe1_x - vel_pipe;
-          pipe2_x <= pipe2_x <= vel_pipe ? 10'd690: pipe2_x - vel_pipe;
+          if (pipe1_x <= vel_pipe) begin
+            pipe1_x <= 10'd690;
+            pipe1_y <= hashed_y;
+          end else begin
+            pipe1_x <= pipe1_x - vel_pipe;
+          end
+
+          if (pipe2_x <= vel_pipe) begin
+            pipe2_x <= 10'd690;
+            pipe2_y <= hashed_y;
+          end else begin
+            pipe2_x <= pipe2_x - vel_pipe;
+          end
           bird_y <= bird_y + vel_bird; 
         end
 
