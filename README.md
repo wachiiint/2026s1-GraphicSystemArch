@@ -9,7 +9,9 @@ Containing 5 projects for this semester
 2. Effpy: Passakorn Yangmak [\@Quackudy](https://github.com/Quackudy)
 
 ## Index
-1. [`LAB1-FlappyBird`](/LAB1.md) — TinyVGAPlayground, forked from https://github.com/TinyTapeout/vga-playground
+1. [`LAB1-FlappyBird`]
+    - A simple Flappy Bird game, press up arrow to fly
+    - Source code is in LAB1/code/project.v
 2. LAB2 — _TBD_
 3. LAB3 — _TBD_
 4. LAB4 — _TBD_
