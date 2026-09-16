@@ -34,4 +34,4 @@ browser only and are lost on refresh. Always edit in VSCode; use the web page
 just to run and view the game.
 
 ## Demo
-<video src="./LAB1/DEMO.mp4" playsinline muted width="60%"></video>
+<video src="LAB1/DEMO.mp4" controls muted width="60%"></video>
