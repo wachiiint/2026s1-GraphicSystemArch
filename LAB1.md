@@ -34,4 +34,4 @@ browser only and are lost on refresh. Always edit in VSCode; use the web page
 just to run and view the game.
 
 ## Demo
-<video src="LAB1/DEMO.mp4" controls muted width="60%"></video>
+[![Wacht the video](https://raw.githubusercontent.com/wachiiint/2026s1-GraphicSystemArch/main/LAB1/demo_thumbnail.png)](https://raw.githubusercontent.com/wachiiint/2026s1-GraphicSystemArch/main/LAB1/DEMO.mp4)
