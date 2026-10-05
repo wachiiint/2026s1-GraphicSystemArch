@@ -197,7 +197,8 @@ module simple_dp_ram #(
 
 
   wire bit_active_this_pix;
-  assign bit_active_this_pix = font_ram_output[7 - pix_x[2:0]];
+  reg [9:0] prev_pix_x, prevprev_pix_x;
+  assign bit_active_this_pix = font_ram_output[7 - prevprev_pix_x[2:0]];
 
   // RGB output logic
   always @(posedge clk) begin
@@ -209,6 +210,8 @@ module simple_dp_ram #(
       row_pos_cursor <= 0;
 
     end else begin
+      prev_pix_x <= pix_x;
+      prevprev_pix_x <= prev_pix_x;
       if (video_active) begin
 
         if (clean_inp_a) col_pos_cursor <= col_pos_cursor + 1;
