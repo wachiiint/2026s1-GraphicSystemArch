@@ -79,10 +79,9 @@ module tt_um_vga_example (
   localparam [5:0] WHITE = {2'b11, 2'b11, 2'b11};
 
 
-
 ////// debounce //////
 
-  reg clean_inp_a, clean_inp_b, clean_inp_l;
+  reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_up, clean_inp_down;
   debounce a_debounce (
     .clk(clk),
     .noisy_button(inp_a),
@@ -98,49 +97,50 @@ module tt_um_vga_example (
     .noisy_button(inp_l),
     .clean_button(clean_inp_l)
   );
+  debounce up_debounce (
+    .clk(clk),
+    .noisy_button(inp_up),
+    .clean_button(clean_inp_up)
+  );
+    debounce down_debounce (
+    .clk(clk),
+    .noisy_button(inp_down),
+    .clean_button(clean_inp_down)
+  );
 //////////////////////////
 
 
 
-///// Map character want to write ////////
-always @(*) begin
-  ascii_number_to_write = 7'd0;
-  if (clean_inp_a)
-    ascii_number_to_write = 7'd65; // A
-end
-//////////////////////////////////////////
-
-
 //////// Tile ram ///////////////////////
 
-  reg [6:0] col_pos_cursor;
-  reg [4:0] row_pos_cursor;
-  reg [6:0] ascii_number_to_write;
+  reg [5:0] col_pos_cursor;
+  reg [3:0] row_pos_cursor;
 
   wire write_enable;
   assign write_enable = clean_inp_a || clean_inp_b;
   //---------------------------------
-  // Bug note (Fixed): คือเวลาเขียนอะต้องเขียนก่อนแล้วค่อยเลื่อน cursor แบบปกติมันถูกละเพราะทำ clock เดียวกัน
+  // [Fixed Bug Note] (Might help nong pun understand code more): คือเวลาเขียนอะต้องเขียนก่อนแล้วค่อยเลื่อน cursor แบบปกติมันถูกละเพราะทำ clock เดียวกัน
   // แต่เวลาลบมันต้องเลื่อน cursor ก่อนแล้วค่อยเขียนตัว blank แต่ทีนี้มันทำใน clock เดียวกัน มันเลยเขียนที่cursor ปัจจุบันก่อนเลื่อน
   // เห็นใช่ไหมว่าถ้าจะทำให้เสร็จใน clock ถัดไป มันต้องบอกทั้ง write_enable ที่จะเขียนและตำแหน่งที่จะเขียน ซึ่งมันบอกลำดับไม่ได้
   // จึงต้อง delay เขียนไป 1 clock เพื่อที่จะบอกค่าทั้งสอง
   reg delay_write_enable;
-  reg [4:0] row_pos_to_write;
-  reg [6:0] col_pos_to_write;
-  reg [6:0] delay_ascii_number_to_write;
+  reg [3:0] row_pos_to_write;
+  reg [5:0] col_pos_to_write;
   //---------------------------------
+
+  reg [6:0] selector_font_to_actually_write;  
     
   simple_dp_ram #(
-    .DATA_WIDTH(11),
-    .ADDR_WIDTH(12)
+    .DATA_WIDTH(7),
+    .ADDR_WIDTH(10)
   ) tile_ram (
 
     .clk(clk),
-    .dat_in(delay_ascii_number_to_write),
+    .dat_in(selector_font_to_actually_write),
     .wr_adr({row_pos_to_write, col_pos_to_write}),
     .wr_en(delay_write_enable),
 
-    .rd_adr({pix_y[9:4], pix_x[9:3]}),
+    .rd_adr({pix_y[8:5], pix_x[9:4]}),
     .dat_out(tile_char_ascii_number)
   );
 ////////////////////////////////////////////
@@ -148,13 +148,23 @@ end
 ////////// Font Rom /////////////////
   wire [6:0] tile_char_ascii_number;
   wire [10:0] font_addr;  
-  assign font_addr = {tile_char_ascii_number, pix_y[3:0]};
+  assign font_addr = {tile_char_ascii_number, pix_y[4:1]}; // read same for two bits then move
   reg [7:0] font_ram_output;
 
   font_rom f_rom (
     .clk(clk),
     .addr(font_addr),
     .data(font_ram_output)
+  );
+
+  reg [6:0] selector_font_select_reg;  
+  wire [10:0] selector_font_addr;
+  assign selector_font_addr = {selector_font_select_reg, pix_y[6:3]};
+  reg [7:0] selector_font_ram_output;
+  font_rom selector_f_rom (
+    .clk(clk),
+    .addr(selector_font_addr),
+    .data(selector_font_ram_output)
   );
 ///////////////////////////////////////
   
@@ -163,9 +173,15 @@ end
 /////// Write actual pixel //////////////
   wire bit_active_this_pix;
   reg [9:0] prev_pix_x, prevprev_pix_x;  // delay 2 clock from tile ram, and font rom just like in lecture
-  assign bit_active_this_pix = font_ram_output[7 - prevprev_pix_x[2:0]];
+  assign bit_active_this_pix = font_ram_output[7 - prevprev_pix_x[3:1]]; // read same for two bits then move
 /////////////////////////////////////////
 
+/////////////////////////////////////////
+  wire selector_bit_active_this_pix;
+  assign selector_bit_active_this_pix = (pix_y >= 384) && (pix_x<64) && selector_font_ram_output[7 - pix_x[5:3]]; //โคตร hardcode but i don't care
+/////////////////////////////////////////
+
+//80 tile col * 30 tile row
 
   // Same old shi
   always @(posedge clk) begin
@@ -178,22 +194,53 @@ end
       col_pos_to_write <= 0;
       row_pos_to_write <= 0;
       delay_write_enable <= 0;
+      selector_font_select_reg <= 7'd65;
+      selector_font_to_actually_write <= 7'd65;
 
     end else begin
       prev_pix_x <= pix_x;
       prevprev_pix_x <= prev_pix_x;
       delay_write_enable <= write_enable;
-      delay_ascii_number_to_write <= ascii_number_to_write;
+      selector_font_to_actually_write <= selector_font_select_reg;
 
-      if (clean_inp_a) begin
-        col_pos_cursor <= col_pos_cursor + 1;
+      if (clean_inp_up) begin
+        selector_font_select_reg <= selector_font_select_reg + 1;
+      end
+      else if (clean_inp_down) begin
+        selector_font_select_reg <= selector_font_select_reg - 1;
+      end
+      else if (clean_inp_a) begin
+
+        // โค้ดตอนนี้คือถ้าอยู่บรรทัดท้ายตัวสุดท้ายแล้วพิมพ์ มันจะแก้ตัวสุดท้าย ไม่ใช่พิมพ์ไม่ได้ ดูแปลกๆแต่ก็ช่างมัน ใครมันจะไปพิมพ์จนหมดหน้า
+        if (col_pos_cursor==39 && row_pos_cursor==10) ; // very end
+        else if (col_pos_cursor==39) begin // end line but not very end
+          col_pos_cursor <= 0;
+          row_pos_cursor <= row_pos_cursor + 1;
+        end else begin
+          col_pos_cursor <= col_pos_cursor + 1;
+          row_pos_cursor <= row_pos_cursor;
+        end
         col_pos_to_write <= col_pos_cursor;
         row_pos_to_write <= row_pos_cursor;
+
       end
       else if (clean_inp_b) begin
-        col_pos_cursor <= col_pos_cursor - 1;
-        col_pos_to_write <= col_pos_cursor - 1;
-        row_pos_to_write <= row_pos_cursor;
+        selector_font_to_actually_write <= 7'd0;
+        if (row_pos_cursor==0 && col_pos_cursor==0) ;
+        else if (col_pos_cursor==0) begin
+          col_pos_cursor <= 39;
+          row_pos_cursor <= row_pos_cursor - 1;
+
+          col_pos_to_write <= 39;
+          row_pos_to_write <= row_pos_cursor - 1;
+        end else begin
+          col_pos_cursor <= col_pos_cursor - 1;
+          row_pos_cursor <= row_pos_cursor;
+
+          col_pos_to_write <= col_pos_cursor - 1;
+          row_pos_cursor <= row_pos_cursor;
+        end
+
       end
       else if (clean_inp_l) begin
         col_pos_cursor <= 0;
@@ -202,7 +249,7 @@ end
 
 
       if (video_active) begin
-        {R, G, B} <= (pix_x==0) ? WHITE : bit_active_this_pix ? GREEN : BLACK;
+        {R, G, B} <= selector_bit_active_this_pix ? WHITE : bit_active_this_pix ? GREEN : BLACK;
       end else begin
         {R, G, B} <= 0;
       end
