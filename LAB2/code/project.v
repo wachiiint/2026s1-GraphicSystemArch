@@ -163,11 +163,13 @@ module tt_um_vga_example (
     end else begin
       prev_pix_x <= pix_x;
       prevprev_pix_x <= prev_pix_x;
+
+
+      if (clean_inp_a) col_pos_cursor <= col_pos_cursor + 1;
+      else if (clean_inp_b) col_pos_cursor <= col_pos_cursor - 1;    
+
+
       if (video_active) begin
-
-        if (clean_inp_a) col_pos_cursor <= col_pos_cursor + 1;
-        else if (clean_inp_b) col_pos_cursor <= col_pos_cursor - 1;    
-
         {R, G, B} <= bit_active_this_pix ? GREEN : BLACK;
       end else begin
         {R, G, B} <= 0;
