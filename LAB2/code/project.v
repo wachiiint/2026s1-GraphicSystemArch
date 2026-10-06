@@ -82,7 +82,7 @@ module tt_um_vga_example (
 
 ////// debounce //////
 
-  reg clean_inp_a, clean_inp_b, clean_inp_b;
+  reg clean_inp_a, clean_inp_b, clean_inp_l;
   debounce a_debounce (
     .clk(clk),
     .noisy_button(inp_a),
@@ -103,10 +103,11 @@ module tt_um_vga_example (
 
 
 ///// Map character want to write ////////
-  always @(*) begin
-    if (clean_inp_a) ascii_number_to_write = 7'd65; // A
-    else if (clean_inp_b) ascii_number_to_write = 7'd0; // blank
-  end
+always @(*) begin
+  ascii_number_to_write = 7'd0;
+  if (clean_inp_a)
+    ascii_number_to_write = 7'd65; // A
+end
 //////////////////////////////////////////
 
 
@@ -117,18 +118,27 @@ module tt_um_vga_example (
   reg [6:0] ascii_number_to_write;
 
   wire write_enable;
-  assign write_enable = inp_a || inp_b;
-
-
+  assign write_enable = clean_inp_a || clean_inp_b;
+  //---------------------------------
+  // Bug note (Fixed): คือเวลาเขียนอะต้องเขียนก่อนแล้วค่อยเลื่อน cursor แบบปกติมันถูกละเพราะทำ clock เดียวกัน
+  // แต่เวลาลบมันต้องเลื่อน cursor ก่อนแล้วค่อยเขียนตัว blank แต่ทีนี้มันทำใน clock เดียวกัน มันเลยเขียนที่cursor ปัจจุบันก่อนเลื่อน
+  // เห็นใช่ไหมว่าถ้าจะทำให้เสร็จใน clock ถัดไป มันต้องบอกทั้ง write_enable ที่จะเขียนและตำแหน่งที่จะเขียน ซึ่งมันบอกลำดับไม่ได้
+  // จึงต้อง delay เขียนไป 1 clock เพื่อที่จะบอกค่าทั้งสอง
+  reg delay_write_enable;
+  reg [4:0] row_pos_to_write;
+  reg [6:0] col_pos_to_write;
+  reg [6:0] delay_ascii_number_to_write;
+  //---------------------------------
+    
   simple_dp_ram #(
     .DATA_WIDTH(11),
     .ADDR_WIDTH(12)
   ) tile_ram (
 
     .clk(clk),
-    .dat_in(ascii_number_to_write),
-    .wr_adr({row_pos_cursor, col_pos_cursor}),
-    .wr_en(write_enable),
+    .dat_in(delay_ascii_number_to_write),
+    .wr_adr({row_pos_to_write, col_pos_to_write}),
+    .wr_en(delay_write_enable),
 
     .rd_adr({pix_y[9:4], pix_x[9:3]}),
     .dat_out(tile_char_ascii_number)
@@ -156,6 +166,7 @@ module tt_um_vga_example (
   assign bit_active_this_pix = font_ram_output[7 - prevprev_pix_x[2:0]];
 /////////////////////////////////////////
 
+
   // Same old shi
   always @(posedge clk) begin
     if (~rst_n) begin
@@ -164,14 +175,26 @@ module tt_um_vga_example (
       B <= 0;
       col_pos_cursor <= 0;
       row_pos_cursor <= 0;
+      col_pos_to_write <= 0;
+      row_pos_to_write <= 0;
+      delay_write_enable <= 0;
 
     end else begin
       prev_pix_x <= pix_x;
       prevprev_pix_x <= prev_pix_x;
+      delay_write_enable <= write_enable;
+      delay_ascii_number_to_write <= ascii_number_to_write;
 
-
-      if (clean_inp_a) col_pos_cursor <= col_pos_cursor + 1;
-      else if (clean_inp_b) col_pos_cursor <= col_pos_cursor - 1;
+      if (clean_inp_a) begin
+        col_pos_cursor <= col_pos_cursor + 1;
+        col_pos_to_write <= col_pos_cursor;
+        row_pos_to_write <= row_pos_cursor;
+      end
+      else if (clean_inp_b) begin
+        col_pos_cursor <= col_pos_cursor - 1;
+        col_pos_to_write <= col_pos_cursor - 1;
+        row_pos_to_write <= row_pos_cursor;
+      end
       else if (clean_inp_l) begin
         col_pos_cursor <= 0;
         row_pos_cursor <= row_pos_cursor + 1;
@@ -179,7 +202,7 @@ module tt_um_vga_example (
 
 
       if (video_active) begin
-        {R, G, B} <= bit_active_this_pix ? GREEN : BLACK;
+        {R, G, B} <= (pix_x==0) ? WHITE : bit_active_this_pix ? GREEN : BLACK;
       end else begin
         {R, G, B} <= 0;
       end

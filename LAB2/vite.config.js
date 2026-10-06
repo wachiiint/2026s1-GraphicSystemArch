@@ -46,4 +46,9 @@ export default defineConfig({
       target: 'esnext',
     },
   },
+  server: {
+    watch: {
+      usePolling: true,
+    },
+  },
 });
