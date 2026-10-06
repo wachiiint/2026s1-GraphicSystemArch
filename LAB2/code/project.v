@@ -82,7 +82,7 @@ module tt_um_vga_example (
 
 ////// debounce //////
 
-  reg clean_inp_a, clean_inp_b;
+  reg clean_inp_a, clean_inp_b, clean_inp_b;
   debounce a_debounce (
     .clk(clk),
     .noisy_button(inp_a),
@@ -92,6 +92,11 @@ module tt_um_vga_example (
     .clk(clk),
     .noisy_button(inp_b),
     .clean_button(clean_inp_b)
+  );
+  debounce l_debounce (
+    .clk(clk),
+    .noisy_button(inp_l),
+    .clean_button(clean_inp_l)
   );
 //////////////////////////
 
@@ -166,7 +171,11 @@ module tt_um_vga_example (
 
 
       if (clean_inp_a) col_pos_cursor <= col_pos_cursor + 1;
-      else if (clean_inp_b) col_pos_cursor <= col_pos_cursor - 1;    
+      else if (clean_inp_b) col_pos_cursor <= col_pos_cursor - 1;
+      else if (clean_inp_l) begin
+        col_pos_cursor <= 0;
+        row_pos_cursor <= row_pos_cursor + 1;
+      end
 
 
       if (video_active) begin
