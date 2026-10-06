@@ -77,11 +77,11 @@ module tt_um_vga_example (
   localparam [5:0] BLACK = {2'b00, 2'b00, 2'b00};
   localparam [5:0] GREEN = {2'b00, 2'b11, 2'b00};
   localparam [5:0] WHITE = {2'b11, 2'b11, 2'b11};
-
+  localparam [5:0] BLUE = {2'b00, 2'b00, 2'b11};
 
 ////// debounce //////
 
-  reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_up, clean_inp_down;
+  reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_up, clean_inp_down, clean_inp_r;
   debounce a_debounce (
     .clk(clk),
     .noisy_button(inp_a),
@@ -107,6 +107,12 @@ module tt_um_vga_example (
     .noisy_button(inp_down),
     .clean_button(clean_inp_down)
   );
+  debounce r_debounce (
+    .clk(clk),
+    .noisy_button(inp_r),
+    .clean_button(clean_inp_r)
+  );
+
 //////////////////////////
 
 
@@ -181,9 +187,34 @@ module tt_um_vga_example (
   assign selector_bit_active_this_pix = (pix_y >= 384) && (pix_x<64) && selector_font_ram_output[7 - pix_x[5:3]]; //โคตร hardcode but i don't care
 /////////////////////////////////////////
 
+/*\
+  reg [5:0] col_pos_cursor;
+  reg [3:0] row_pos_cursor;
+  */
+wire cursor_is_here;
+reg cursor_is_on;
+assign cursor_is_here =
+    ((pix_x >= {col_pos_cursor,4'd4}) && (pix_x <= {col_pos_cursor,4'd6})) &&
+    (pix_y[8:5] == row_pos_cursor);
+
 //80 tile col * 30 tile row
 
   // Same old shi
+
+  reg [10:0] timer;
+
+  always @(posedge vsync) begin
+    if (~rst_n) begin
+      timer <= 0;
+      cursor_is_on <= 0;
+    end
+    else begin
+      timer <= timer + 1;
+      if (timer[2:0] == 3'd0) cursor_is_on <= ~cursor_is_on;
+
+    end
+  end
+
   always @(posedge clk) begin
     if (~rst_n) begin
       R <= 0;
@@ -196,6 +227,7 @@ module tt_um_vga_example (
       delay_write_enable <= 0;
       selector_font_select_reg <= 7'd65;
       selector_font_to_actually_write <= 7'd65;
+      cursor_is_on <= 1'b0;
 
     end else begin
       prev_pix_x <= pix_x;
@@ -209,6 +241,20 @@ module tt_um_vga_example (
       else if (clean_inp_down) begin
         selector_font_select_reg <= selector_font_select_reg - 1;
       end
+      else if (clean_inp_r) begin
+        selector_font_to_actually_write <= 7'd0;
+        if (col_pos_cursor==39 && row_pos_cursor==10) ; // very end
+        else if (col_pos_cursor==39) begin // end line but not very end
+          col_pos_cursor <= 0;
+          row_pos_cursor <= row_pos_cursor + 1;
+        end else begin
+          col_pos_cursor <= col_pos_cursor + 1;
+          row_pos_cursor <= row_pos_cursor;
+        end
+        col_pos_to_write <= col_pos_cursor;
+        row_pos_to_write <= row_pos_cursor;
+      end
+      
       else if (clean_inp_a) begin
 
         // โค้ดตอนนี้คือถ้าอยู่บรรทัดท้ายตัวสุดท้ายแล้วพิมพ์ มันจะแก้ตัวสุดท้าย ไม่ใช่พิมพ์ไม่ได้ ดูแปลกๆแต่ก็ช่างมัน ใครมันจะไปพิมพ์จนหมดหน้า
@@ -249,7 +295,7 @@ module tt_um_vga_example (
 
 
       if (video_active) begin
-        {R, G, B} <= selector_bit_active_this_pix ? WHITE : bit_active_this_pix ? GREEN : BLACK;
+        {R, G, B} <= selector_bit_active_this_pix ? WHITE : bit_active_this_pix ? GREEN : (cursor_is_here && cursor_is_on) ? WHITE : BLACK;
       end else begin
         {R, G, B} <= 0;
       end
