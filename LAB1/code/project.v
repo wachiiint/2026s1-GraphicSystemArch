@@ -162,14 +162,14 @@ always @(posedge vsync, negedge rst_n) begin
           // update position pipe + bird
           if (pipe1_x <= vel_pipe) begin
             pipe1_x <= 10'd690;
-            pipe1_y <= hashed_y;
+            pipe1_y <= counter[3] ? 10'd80 : 10'd220;
           end else begin
             pipe1_x <= pipe1_x - vel_pipe;
           end
 
           if (pipe2_x <= vel_pipe) begin
             pipe2_x <= 10'd690;
-            pipe2_y <= hashed_y;
+            pipe2_y <= counter[4] ? 10'd250 : 10'd60;
           end else begin
             pipe2_x <= pipe2_x - vel_pipe;
           end

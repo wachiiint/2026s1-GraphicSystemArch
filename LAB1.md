@@ -6,10 +6,12 @@ I will do flappybird game in this project
 ## Setup
 ```bash
 # setup
-cd LAB1
+cp .env.example .env
+cd vgaEngine
 npm install
 
 # run on localhost (Vite dev server, default http://localhost:5173)
+### first, go to .env then change to compilePath=LAB1/code
 npm start
 ```
 
@@ -34,4 +36,4 @@ browser only and are lost on refresh. Always edit in VSCode; use the web page
 just to run and view the game.
 
 ## Demo
-[![Wacht the video](https://raw.githubusercontent.com/wachiiint/2026s1-GraphicSystemArch/main/LAB1/demo_thumbnail.png)](https://raw.githubusercontent.com/wachiiint/2026s1-GraphicSystemArch/main/LAB1/DEMO.mp4)
+Watch video by go to `LAB1/demo.mp4`

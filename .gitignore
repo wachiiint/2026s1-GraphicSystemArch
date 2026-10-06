@@ -1,3 +1,5 @@
+.env
+
 # Dependencies (all sub-projects)
 node_modules/
 

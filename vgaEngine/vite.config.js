@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
-const CODE_DIR = fileURLToPath(new URL('code', import.meta.url));
+const WORKSPACE_ROOT = fileURLToPath(new URL('..', import.meta.url));
+let CODE_DIR;
 const isSourceFile = (name) => /^[\w.-]+\.s?v$/.test(name);
 
 /**
@@ -36,19 +37,33 @@ function serveCodeDir() {
   };
 }
 
-export default defineConfig({
-  plugins: [serveCodeDir()],
-  build: {
-    target: 'esnext',
-  },
-  optimizeDeps: {
-    esbuildOptions: {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, WORKSPACE_ROOT, '');
+  const compilePath = env.compilePath || 'LAB1/code';
+  CODE_DIR = path.resolve(WORKSPACE_ROOT, compilePath);
+
+  if (fs.existsSync(CODE_DIR)) {
+    console.log(`[vgaEngine] compiling from ${compilePath}`);
+  } else {
+    console.warn(
+      `[vgaEngine] compilePath "${compilePath}" not found (${CODE_DIR}) — falling back to bundled examples`,
+    );
+  }
+
+  return {
+    plugins: [serveCodeDir()],
+    build: {
       target: 'esnext',
     },
-  },
-  server: {
-    watch: {
-      usePolling: true,
+    optimizeDeps: {
+      esbuildOptions: {
+        target: 'esnext',
+      },
     },
-  },
+    server: {
+      watch: {
+        usePolling: true,
+      },
+    },
+  };
 });
