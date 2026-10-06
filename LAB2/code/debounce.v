@@ -4,8 +4,8 @@
 // With a 25 MHz clock, 250,000 cycles = 10 ms.
 module debounce (
     input  wire clk,
-    input  wire noisy_button,
-    output reg  clean_button
+    input  wire in,
+    output reg  out
 );
 
     localparam [17:0] STABLE_CYCLES = 18'd250_000;
@@ -24,15 +24,15 @@ module debounce (
         sync_1        = 1'b0;
         stable_button = 1'b0;
         counter       = 18'd0;
-        clean_button  = 1'b0;
+        out  = 1'b0;
     end
 
     always @(posedge clk) begin
-        sync_0 <= noisy_button;
+        sync_0 <= in;
         sync_1 <= sync_0;
 
-        // Default: clean_button is a one-clock pulse, not a held level.
-        clean_button <= 1'b0;
+        // Default: out is a one-clock pulse, not a held level.
+        out <= 1'b0;
 
         if (sync_1 == stable_button) begin
             // No pending state change.
@@ -44,7 +44,7 @@ module debounce (
 
             // Pulse only for a debounced press, never for a release.
             if (sync_1)
-                clean_button <= 1'b1;
+                out <= 1'b1;
         end else begin
             counter <= counter + 1'b1;
         end

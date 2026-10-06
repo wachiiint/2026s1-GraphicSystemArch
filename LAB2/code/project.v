@@ -71,8 +71,6 @@ module tt_um_vga_example (
       .r(inp_r)
   );
 
-
-
   // Colors
   localparam [5:0] BLACK = {2'b00, 2'b00, 2'b00};
   localparam [5:0] GREEN = {2'b00, 2'b11, 2'b00};
@@ -80,39 +78,13 @@ module tt_um_vga_example (
   localparam [5:0] BLUE = {2'b00, 2'b00, 2'b11};
 
 ////// debounce //////
-
-  reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_up, clean_inp_down, clean_inp_r;
-  debounce a_debounce (
-    .clk(clk),
-    .noisy_button(inp_a),
-    .clean_button(clean_inp_a)
-  );
-  debounce b_debounce (
-    .clk(clk),
-    .noisy_button(inp_b),
-    .clean_button(clean_inp_b)
-  );
-  debounce l_debounce (
-    .clk(clk),
-    .noisy_button(inp_l),
-    .clean_button(clean_inp_l)
-  );
-  debounce up_debounce (
-    .clk(clk),
-    .noisy_button(inp_up),
-    .clean_button(clean_inp_up)
-  );
-    debounce down_debounce (
-    .clk(clk),
-    .noisy_button(inp_down),
-    .clean_button(clean_inp_down)
-  );
-  debounce r_debounce (
-    .clk(clk),
-    .noisy_button(inp_r),
-    .clean_button(clean_inp_r)
-  );
-
+  reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_up, clean_inp_down, clean_inp_r; 
+  debounce a_debounce (.clk(clk), .in(inp_a), .out(clean_inp_a));
+  debounce b_debounce (.clk(clk), .in(inp_b), .out(clean_inp_b));
+  debounce l_debounce (.clk(clk), .in(inp_l), .out(clean_inp_l));
+  debounce u_debounce (.clk(clk), .in(inp_up), .out(clean_inp_up));
+  debounce d_debounce (.clk(clk), .in(inp_down), .out(clean_inp_down));
+  debounce r_debounce (.clk(clk), .in(inp_r), .out(clean_inp_r));
 //////////////////////////
 
 
@@ -198,9 +170,7 @@ assign cursor_is_here =
     (pix_y[8:5] == row_pos_cursor);
 
 //80 tile col * 30 tile row
-
   // Same old shi
-
   reg [10:0] timer;
 
   always @(posedge vsync) begin
@@ -211,7 +181,6 @@ assign cursor_is_here =
     else begin
       timer <= timer + 1;
       if (timer[2:0] == 3'd0) cursor_is_on <= ~cursor_is_on;
-
     end
   end
 
