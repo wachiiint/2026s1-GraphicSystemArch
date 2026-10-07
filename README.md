@@ -21,6 +21,7 @@ compilePath=LAB{replace_lab_number_here}/code npm start
     - Press A to type, B to erase
     - Press L for new line and R for space
     - Arrow in all direction to move cursor
+[Screencast_20261007_121535.webm](https://github.com/user-attachments/assets/f5954805-b547-4b59-8987-d1ad62d30305)
 3. LAB3 — _TBD_
 4. LAB4 — _TBD_
 5. LAB5 — _TBD_
