@@ -78,13 +78,18 @@ module tt_um_vga_example (
   localparam [5:0] BLUE = {2'b00, 2'b00, 2'b11};
 
 ////// debounce //////
-  reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_up, clean_inp_down, clean_inp_r; 
+  reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_up, clean_inp_down, clean_inp_r, clean_inp_left, clean_inp_right, clean_inp_x, clean_inp_y; 
   debounce a_debounce (.clk(clk), .in(inp_a), .out(clean_inp_a));
   debounce b_debounce (.clk(clk), .in(inp_b), .out(clean_inp_b));
   debounce l_debounce (.clk(clk), .in(inp_l), .out(clean_inp_l));
-  debounce u_debounce (.clk(clk), .in(inp_up), .out(clean_inp_up));
-  debounce d_debounce (.clk(clk), .in(inp_down), .out(clean_inp_down));
   debounce r_debounce (.clk(clk), .in(inp_r), .out(clean_inp_r));
+  debounce up_debounce (.clk(clk), .in(inp_up), .out(clean_inp_up));
+  debounce down_debounce (.clk(clk), .in(inp_down), .out(clean_inp_down));
+  debounce left_debounce (.clk(clk), .in(inp_left), .out(clean_inp_left));
+  debounce right_debounce (.clk(clk), .in(inp_right), .out(clean_inp_right));
+  debounce x_debounce (.clk(clk), .in(inp_x), .out(clean_inp_x));
+  debounce y_debounce (.clk(clk), .in(inp_y), .out(clean_inp_y));
+
 //////////////////////////
 
 
@@ -159,15 +164,15 @@ module tt_um_vga_example (
   assign selector_bit_active_this_pix = (pix_y >= 384) && (pix_x<64) && selector_font_ram_output[7 - pix_x[5:3]]; //โคตร hardcode but i don't care
 /////////////////////////////////////////
 
-/*\
-  reg [5:0] col_pos_cursor;
-  reg [3:0] row_pos_cursor;
-  */
 wire cursor_is_here;
 reg cursor_is_on;
 assign cursor_is_here =
     ((pix_x >= {col_pos_cursor,4'd4}) && (pix_x <= {col_pos_cursor,4'd6})) &&
     (pix_y[8:5] == row_pos_cursor);
+
+
+reg [5:0] num_char_this_row [0:10]; // อย่าลืมว่า unpacked array มี 11 ไม่ใช่ 2^11
+reg [3:0] num_row_have_text; //นับว่ามีข้อความไปแล้วกี่บรรทัด
 
 //80 tile col * 30 tile row
   // Same old shi
@@ -184,6 +189,8 @@ assign cursor_is_here =
     end
   end
 
+  integer i;
+
   always @(posedge clk) begin
     if (~rst_n) begin
       R <= 0;
@@ -197,28 +204,95 @@ assign cursor_is_here =
       selector_font_select_reg <= 7'd65;
       selector_font_to_actually_write <= 7'd65;
       cursor_is_on <= 1'b0;
+      num_row_have_text <= 4'd0;
+
+      for (i=0; i<=15; i = i+1) begin
+        num_char_this_row[i] <= 6'd0;
+      end
 
     end else begin
+
       prev_pix_x <= pix_x;
       prevprev_pix_x <= prev_pix_x;
       delay_write_enable <= write_enable;
       selector_font_to_actually_write <= selector_font_select_reg;
 
-      if (clean_inp_up) begin
+      if (clean_inp_x) begin
         selector_font_select_reg <= selector_font_select_reg + 1;
       end
-      else if (clean_inp_down) begin
+      else if (clean_inp_y) begin
         selector_font_select_reg <= selector_font_select_reg - 1;
       end
+/*\
+  reg [5:0] col_pos_cursor;
+  reg [3:0] row_pos_cursor;
+*/
+
+      //// Do moving cursor later
+      else if (clean_inp_left) begin
+        //normal case, left most case, first char case
+        if (row_pos_cursor==4'd0 && col_pos_cursor==6'd0) begin
+          ; // Do nothing
+        end else if (col_pos_cursor==6'd0) begin
+          row_pos_cursor <= row_pos_cursor-4'd1;
+          col_pos_cursor <= num_char_this_row[row_pos_cursor-1];
+        end else begin
+          col_pos_cursor <= col_pos_cursor - 6'd1;
+        end
+      end
+      else if (clean_inp_right) begin
+        //normal case, right most case, last char case
+        if (row_pos_cursor==4'd10 && col_pos_cursor==6'd39) begin
+          ;
+        end else if (row_pos_cursor==num_row_have_text) begin
+          ;
+        end else if (col_pos_cursor==num_char_this_row[row_pos_cursor]) begin
+          row_pos_cursor <= row_pos_cursor + 4'd1;
+          col_pos_cursor <= 6'd0;
+        end else begin
+          col_pos_cursor <= col_pos_cursor + 6'd1;
+        end
+      end
+      else if (clean_inp_up) begin
+        //first line case, go up have char, go up don't have char
+        if (row_pos_cursor==4'd0) begin
+          ;
+        end else if (row_pos_cursor>4'd0 && (num_char_this_row[row_pos_cursor-1]>=col_pos_cursor)) begin
+          row_pos_cursor <= row_pos_cursor - 4'd1;
+        end else if (row_pos_cursor>4'd0 && (num_char_this_row[row_pos_cursor-1]<col_pos_cursor)) begin
+          row_pos_cursor <= row_pos_cursor - 4'd1;
+          col_pos_cursor <= num_char_this_row[row_pos_cursor-4'd1];
+        end
+      end
+      else if (clean_inp_down) begin
+        //last line case, go down have char,go down, don't have char
+        if (row_pos_cursor>=num_row_have_text) begin
+          ;
+        end else if (row_pos_cursor<4'd10 && ((num_char_this_row[row_pos_cursor+1]>=col_pos_cursor))) begin
+          row_pos_cursor <= row_pos_cursor + 4'd1;
+        end else if (row_pos_cursor<4'd10 && ((num_char_this_row[row_pos_cursor+1]<col_pos_cursor))) begin
+          row_pos_cursor <= row_pos_cursor + 4'd1;
+          col_pos_cursor <= num_char_this_row[row_pos_cursor+1];
+        end
+
+      end
+
       else if (clean_inp_r) begin
+
+        if (row_pos_cursor == num_row_have_text) begin
+          num_row_have_text <= num_row_have_text + 4'd1;
+        end
+        
         selector_font_to_actually_write <= 7'd0;
         if (col_pos_cursor==39 && row_pos_cursor==10) ; // very end
         else if (col_pos_cursor==39) begin // end line but not very end
           col_pos_cursor <= 0;
           row_pos_cursor <= row_pos_cursor + 1;
+          num_char_this_row[row_pos_cursor+1] <= 1;
         end else begin
           col_pos_cursor <= col_pos_cursor + 1;
           row_pos_cursor <= row_pos_cursor;
+          num_char_this_row[row_pos_cursor] <= num_char_this_row[row_pos_cursor]+1;
         end
         col_pos_to_write <= col_pos_cursor;
         row_pos_to_write <= row_pos_cursor;
@@ -226,40 +300,75 @@ assign cursor_is_here =
       
       else if (clean_inp_a) begin
 
+        if (row_pos_cursor == num_row_have_text) begin
+          num_row_have_text <= num_row_have_text + 4'd1;
+        end
+
         // โค้ดตอนนี้คือถ้าอยู่บรรทัดท้ายตัวสุดท้ายแล้วพิมพ์ มันจะแก้ตัวสุดท้าย ไม่ใช่พิมพ์ไม่ได้ ดูแปลกๆแต่ก็ช่างมัน ใครมันจะไปพิมพ์จนหมดหน้า
         if (col_pos_cursor==39 && row_pos_cursor==10) ; // very end
         else if (col_pos_cursor==39) begin // end line but not very end
           col_pos_cursor <= 0;
           row_pos_cursor <= row_pos_cursor + 1;
+          num_char_this_row[row_pos_cursor+1] <= 1;
         end else begin
           col_pos_cursor <= col_pos_cursor + 1;
           row_pos_cursor <= row_pos_cursor;
+          if (col_pos_cursor==num_char_this_row[row_pos_cursor]) num_char_this_row[row_pos_cursor] <= num_char_this_row[row_pos_cursor]+1;
         end
         col_pos_to_write <= col_pos_cursor;
         row_pos_to_write <= row_pos_cursor;
 
       end
       else if (clean_inp_b) begin
+        
+        if (row_pos_cursor==num_row_have_text) begin
+          num_row_have_text <= num_row_have_text - 4'd1;
+        end
+
         selector_font_to_actually_write <= 7'd0;
         if (row_pos_cursor==0 && col_pos_cursor==0) ;
         else if (col_pos_cursor==0) begin
-          col_pos_cursor <= 39;
-          row_pos_cursor <= row_pos_cursor - 1;
+        //เคสนี้ ตอนลบต้องแบ่งเคสว่าบรรทัดก่อนเต็มไหม ถ้าเต็มก็ลบตัวท้ายบรรทัดก่อน ถ้าไม่เต็มก็แค่เอา cursor ไปต่อท้าย
+          if (num_char_this_row[row_pos_cursor-1]==40) begin
+            col_pos_cursor <= 39;
+            row_pos_cursor <= row_pos_cursor - 1;
 
-          col_pos_to_write <= 39;
-          row_pos_to_write <= row_pos_cursor - 1;
+            col_pos_to_write <= 39;
+            row_pos_to_write <= row_pos_cursor - 1;
+
+            num_char_this_row[row_pos_cursor-1] <= 39;
+
+          end else begin
+            col_pos_cursor <= num_char_this_row[row_pos_cursor-1];
+            row_pos_cursor <= row_pos_cursor - 1;
+
+            col_pos_to_write <= num_char_this_row[row_pos_cursor-1];
+            row_pos_to_write <= row_pos_cursor - 1;
+
+          end
+          
         end else begin
           col_pos_cursor <= col_pos_cursor - 1;
           row_pos_cursor <= row_pos_cursor;
 
           col_pos_to_write <= col_pos_cursor - 1;
           row_pos_cursor <= row_pos_cursor;
+
+          num_char_this_row[row_pos_cursor] <= num_char_this_row[row_pos_cursor]-1;
         end
 
       end
       else if (clean_inp_l) begin
-        col_pos_cursor <= 0;
-        row_pos_cursor <= row_pos_cursor + 1;
+
+        if (row_pos_cursor == num_row_have_text) begin
+          num_row_have_text <= num_row_have_text + 4'd1;
+        end
+
+        if (row_pos_cursor<10) begin
+          col_pos_cursor <= 0;
+          row_pos_cursor <= row_pos_cursor + 1;
+        end
+
       end
 
 
