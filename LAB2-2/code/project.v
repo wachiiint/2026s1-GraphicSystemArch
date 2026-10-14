@@ -12,8 +12,8 @@
 
 parameter IMG_SIZE = 320;  // Size of the image in pixels
 parameter MUL_FACTOR = 2;   // vga_res/img_size
-parameter DISPLAY_WIDTH = 640;  // VGA display width
-parameter DISPLAY_HEIGHT = 480;  // VGA display height
+parameter DISPLAY_WIDTH = 320;  // VGA display width
+parameter DISPLAY_HEIGHT = 240;  // VGA display height
 
 `define COLOR_WHITE 3'd7
 
@@ -64,11 +64,14 @@ module tt_um_vga_example (
 
   initial begin
     $readmemh("../data/img.mem", img);
+    // $readmemh("../data/bg1.mem", img2);
   end
 
-  always @(posedge clk)begin
-       color <= img[mem_index];
-  end
+  // always @(posedge clk)begin
+  //     color <= img[mem_index]+img2[mem_index];
+  // end
+
+  assign color = img[mem_index];
   assign mem_index = (pix_y / MUL_FACTOR) * IMG_SIZE + pix_x / MUL_FACTOR;  
   //assign color = img[mem_index]+img2[mem_index];
   assign R = (video_active)? color[5:4]:0;
