@@ -2,10 +2,12 @@
 
 # Dependencies (all sub-projects)
 node_modules/
+.venv/
 
 # Build output
 dist/
 build/
+**.mem
 
 # Editor / OS
 .vscode/

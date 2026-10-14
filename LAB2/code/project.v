@@ -156,18 +156,18 @@ module tt_um_vga_example (
   wire bit_active_this_pix;
   wire selector_bit_active_this_pix;
   reg [9:0] prev_pix_x, prevprev_pix_x;  // delay 2 clock from tile ram + font rom (just like in lecture)
-  assign bit_active_this_pix = font_ram_output[7 - prevprev_pix_x[3:1]]; // read same for two bits then move
-  // hardcoded but effpy dont care
-  assign selector_bit_active_this_pix = (pix_y >= 384) && (pix_x<64) && selected_font_output[7 - pix_x[5:3]];
+  // read same for two bits then move, 7 - because data read from ram is BigEndian
+
+  assign bit_active_this_pix = font_ram_output[3'b111 - prevprev_pix_x[3:1]]; 
+  assign selector_bit_active_this_pix = (pix_y >= 384) && (pix_x<64) && selected_font_output[3'b111 - pix_x[5:3]];
 
   reg [10:0] timer;
-  wire cursor_is_here;
-  reg cursor_is_on;
-  assign cursor_is_here =
+  wire cursor_is_here =
       ((pix_x >= {tc_cursor,4'd4}) && (pix_x <= {tc_cursor,4'd6})) &&  // 2 px cursor size
       (pix_y[8:5] == tr_cursor);
-  reg [5:0] num_char_this_row [0:10]; // อย่าลืมว่า unpacked array มี 11 ไม่ใช่ 2^11
-  reg [3:0] num_row_have_text; //นับว่ามีข้อความไปแล้วกี่บรรทัด
+  reg cursor_is_on;
+  reg [5:0] num_char_this_row [0:10]; // array size 11 of 6 bit 
+  reg [3:0] num_row_have_text; // num of row that have text
 
     // delay
     always @(posedge clk) begin
