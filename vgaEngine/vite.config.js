@@ -29,6 +29,18 @@ function serveCodeDir() {
           }
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(files));
+        } else if (req.method === 'GET' && req.url.startsWith('/data?')) {
+          // GET /__code/data?path=<p> -> $readmem file, resolved relative to CODE_DIR
+          const rel = new URLSearchParams(req.url.slice('/data?'.length)).get('path') ?? '';
+          const file = path.resolve(CODE_DIR, rel);
+          const inWorkspace = !path.relative(WORKSPACE_ROOT, file).startsWith('..');
+          if (inWorkspace && fs.existsSync(file) && fs.statSync(file).isFile()) {
+            res.setHeader('Content-Type', 'text/plain');
+            res.end(fs.readFileSync(file, 'utf8'));
+          } else {
+            res.statusCode = 404;
+            res.end();
+          }
         } else {
           next();
         }

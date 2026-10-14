@@ -1,4 +1,5 @@
 import { Project } from './examples/Project';
+import { extractReadmemPaths } from './github/loadProject';
 
 /**
  * Loads the Verilog files from the local `code/` directory (served by the
@@ -28,11 +29,20 @@ export async function loadLocalProject(): Promise<Project | null> {
         sources[name] = content;
       }
     }
+    // Fetch data files referenced via $readmemh/$readmemb, keyed by the literal path
+    const dataFiles: Record<string, string> = {};
+    for (const p of extractReadmemPaths(sources)) {
+      const dataRes = await fetch(`/__code/data?path=${encodeURIComponent(p)}`);
+      if (dataRes.ok) {
+        dataFiles[p] = await dataRes.text();
+      }
+    }
     return {
       id: 'local',
       name: 'My Project (code/)',
       author: 'local',
       sources,
+      dataFiles: Object.keys(dataFiles).length > 0 ? dataFiles : undefined,
     };
   } catch {
     return null;
