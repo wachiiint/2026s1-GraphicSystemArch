@@ -204,12 +204,11 @@ module tt_um_vga_example (
       for (i=0; i<=10; i = i+1) num_char_this_row[i] <= 6'd0;
     end else begin
       char_ascii_w <= selected_char;
-      // change char forward
-      if (clean_inp_x) selected_char <= selected_char + 1;
-      // change char backward
-      else if (clean_inp_y) selected_char <= selected_char - 1;
-      // move cursor left
-      else if (clean_inp_left) begin
+      // CHARACTER
+      if (clean_inp_x) selected_char <= selected_char + 1; // change char next
+      else if (clean_inp_y) selected_char <= selected_char - 1; // change char prev
+      // NAVIGATE
+      else if (clean_inp_left) begin // backward
         //normal case, left most case, first char case
         if (tr_cursor==4'd0 && tc_cursor==6'd0) ; // Do nothing
         else if (tc_cursor==6'd0) begin
@@ -217,8 +216,7 @@ module tt_um_vga_example (
           tc_cursor <= num_char_this_row[tr_cursor-1];
         end else tc_cursor <= tc_cursor - 6'd1;
       end
-      // move cursor right
-      else if (clean_inp_right) begin
+      else if (clean_inp_right) begin // forward
         //normal case, right most case, last char case
         if (tr_cursor==4'd10 && tc_cursor==6'd39) ;
         else if (tr_cursor==num_row_have_text) ;
@@ -227,8 +225,7 @@ module tt_um_vga_example (
           tc_cursor <= 6'd0;
         end else tc_cursor <= tc_cursor + 6'd1;
       end
-      // move cursor up
-      else if (clean_inp_up) begin
+      else if (clean_inp_up) begin // up
         //first line case, go up have char, go up don't have char
         if (tr_cursor==4'd0) ;
         else if (num_char_this_row[tr_cursor-1] >= tc_cursor) tr_cursor <= tr_cursor - 4'd1;
@@ -237,8 +234,7 @@ module tt_um_vga_example (
           tc_cursor <= num_char_this_row[tr_cursor-1];
         end
       end
-      // move cursor down
-      else if (clean_inp_down) begin
+      else if (clean_inp_down) begin //down
         //last line case, go down have char, go down don't have char
         if (tr_cursor >= num_row_have_text) ;
         else if (tr_cursor<4'd10 && num_char_this_row[tr_cursor+1] >= tc_cursor) tr_cursor <= tr_cursor + 4'd1;
@@ -247,24 +243,9 @@ module tt_um_vga_example (
           tc_cursor <= num_char_this_row[tr_cursor+1];
         end
       end
-      // move next
-      else if (clean_inp_r) begin
-        if (tr_cursor == num_row_have_text) num_row_have_text <= num_row_have_text + 4'd1;
-        char_ascii_w <= 7'd0; //empty char
-        if (tc_cursor==39 && tr_cursor==10) ; // very end
-        else if (tc_cursor==39) begin // end line but not very end
-          tc_cursor <= 0;
-          tr_cursor <= tr_cursor + 1;
-          num_char_this_row[tr_cursor+1] <= 1;
-        end else begin
-          tc_cursor <= tc_cursor + 1;
-          num_char_this_row[tr_cursor] <= num_char_this_row[tr_cursor] + 1;
-        end
-        tc_to_write <= tc_cursor;
-        tr_to_write <= tr_cursor;
-      end
-      // insert
-      else if (clean_inp_a) begin
+
+      // TEXT modification
+      else if (clean_inp_a) begin // insert
         if (tr_cursor == num_row_have_text) num_row_have_text <= num_row_have_text + 4'd1;
         // โค้ดตอนนี้คือถ้าอยู่บรรทัดท้ายตัวสุดท้ายแล้วพิมพ์ มันจะแก้ตัวสุดท้าย ไม่ใช่พิมพ์ไม่ได้ ดูแปลกๆแต่ก็ช่างมัน ใครมันจะไปพิมพ์จนหมดหน้า
         if (tc_cursor==39 && tr_cursor==10) ; // very end
@@ -279,8 +260,7 @@ module tt_um_vga_example (
         tc_to_write <= tc_cursor;
         tr_to_write <= tr_cursor;
       end
-      // delete
-      else if (clean_inp_b) begin
+      else if (clean_inp_b) begin // delete
         if (tr_cursor == num_row_have_text) num_row_have_text <= num_row_have_text - 4'd1;
         char_ascii_w <= 7'd0;
         if (tr_cursor==0 && tc_cursor==0) ;
@@ -302,8 +282,22 @@ module tt_um_vga_example (
           num_char_this_row[tr_cursor] <= num_char_this_row[tr_cursor] - 1;
         end
       end
-      // move next line
-      else if (clean_inp_l) begin
+      else if (clean_inp_r) begin // space
+        if (tr_cursor == num_row_have_text) num_row_have_text <= num_row_have_text + 4'd1;
+        char_ascii_w <= 7'd0; //empty char
+        if (tc_cursor==39 && tr_cursor==10) ; // very end
+        else if (tc_cursor==39) begin // end line but not very end
+          tc_cursor <= 0;
+          tr_cursor <= tr_cursor + 1;
+          num_char_this_row[tr_cursor+1] <= 1;
+        end else begin
+          tc_cursor <= tc_cursor + 1;
+          num_char_this_row[tr_cursor] <= num_char_this_row[tr_cursor] + 1;
+        end
+        tc_to_write <= tc_cursor;
+        tr_to_write <= tr_cursor;
+      end
+      else if (clean_inp_l) begin // new line
         if (tr_cursor == num_row_have_text) num_row_have_text <= num_row_have_text + 4'd1;
         if (tr_cursor<10) begin
           tc_cursor <= 0;
