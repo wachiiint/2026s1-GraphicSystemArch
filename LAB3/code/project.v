@@ -40,6 +40,7 @@ module tt_um_vga_example (
   // VGA signals
   wire hsync;
   wire vsync;
+  wire fsync;
   wire [1:0] R;
   wire [1:0] G;
   wire [1:0] B;
@@ -62,41 +63,22 @@ module tt_um_vga_example (
       .reset(~rst_n),
       .hsync(hsync),
       .vsync(vsync),
+      .fsync(fsync), // framesync = 1 when change frame
       .display_on(video_active),
       .hpos(pix_x),
       .vpos(pix_y)
   );
 
-  // reg [5:0] img[76799:0];  // 320x240
-  // wire [16:0] mem_index;
   reg [5:0] color;
 
-  // initial begin
-  //   $readmemh("../data/img.mem", img);
-  //   // $readmemh("../data/bg1.mem", img2);
-  // end
-
-  // always @(posedge clk)begin
-  //     color <= img[mem_index]+img2[mem_index];
-  // end
-
-  // assign color = img[mem_index];
-  // assign mem_index = (pix_y / MUL_FACTOR) * IMG_SIZE + pix_x / MUL_FACTOR;  // read 6 bit at (y/2*320)
-
-  reg [31:0] counter;
-  reg [15:0] t;
-  always @(posedge clk) begin
-    if(~rst_n) counter <= 0;
-    else counter <= counter + 1;
-    t <= counter[23:8]; //offset
-  end
   compute  #(
     .IMG_SIZE(IMG_SIZE),
     .MUL_FACTOR(MUL_FACTOR)
   ) _compute (
-    .x(pix_x),
-    .y(pix_y),
-    .t(t),
+    .xin(pix_x),
+    .yin(pix_y),
+    .clk(clk),
+    .fsync(fsync),
     .rst_n(rst_n),
     .out(color)
   );
