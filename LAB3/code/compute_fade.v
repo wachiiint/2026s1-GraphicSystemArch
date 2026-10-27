@@ -3,7 +3,7 @@
 
 `default_nettype none
 
-parameter MAX_T = 640;      // maximum time of the transition
+parameter MAX_T = 196;      // maximum time of the transition
 parameter BLOCK = 16;       // block size 2^^n
 parameter BAND = 1;         // BAND of changing
 parameter T_SCALE = 4;      // TIME SCALING
