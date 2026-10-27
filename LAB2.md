@@ -15,4 +15,5 @@ Inspired by pokemon essentials text input
 
 ## Demo
 [Demo Video](https://github.com/user-attachments/assets/f5954805-b547-4b59-8987-d1ad62d30305)
+
 Or watch video by go to `LAB2/LAB2-demo.webm`

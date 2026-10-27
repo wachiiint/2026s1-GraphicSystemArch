@@ -10,6 +10,15 @@
 
 `default_nettype none
 
+/*
+  VGA Display = 640*480
+  img = 320*240 -> mem = 76800 line
+  Therefore,
+  IMG_SIZE = 320 -> "number of x pixel in 1 line"
+  MUL_FACTOR = 640/320 = 2
+  color(x,y) = img[ y/MUL_FACTOR * IMG_SIZE + pix_x / MUL_FACTOR ]
+  assign mem_index = (pix_y / MUL_FACTOR) * IMG_SIZE + pix_x / MUL_FACTOR;  // read 6 bit at (y/2*320)
+*/
 parameter IMG_SIZE = 320;  // Size of the image in pixels
 parameter MUL_FACTOR = 2;   // vga_res/img_size
 parameter DISPLAY_WIDTH = 320;  // VGA display width
@@ -58,21 +67,41 @@ module tt_um_vga_example (
       .vpos(pix_y)
   );
 
-  reg [5:0] img[76799:0];  // 320x240
-  wire [16:0] mem_index;
+  // reg [5:0] img[76799:0];  // 320x240
+  // wire [16:0] mem_index;
   reg [5:0] color;
 
-  initial begin
-    $readmemh("../data/img.mem", img);
-    // $readmemh("../data/bg1.mem", img2);
-  end
+  // initial begin
+  //   $readmemh("../data/img.mem", img);
+  //   // $readmemh("../data/bg1.mem", img2);
+  // end
 
   // always @(posedge clk)begin
   //     color <= img[mem_index]+img2[mem_index];
   // end
 
-  assign color = img[mem_index];
-  assign mem_index = (pix_y / MUL_FACTOR) * IMG_SIZE + pix_x / MUL_FACTOR;  
+  // assign color = img[mem_index];
+  // assign mem_index = (pix_y / MUL_FACTOR) * IMG_SIZE + pix_x / MUL_FACTOR;  // read 6 bit at (y/2*320)
+
+  reg [31:0] counter;
+  reg [15:0] t;
+  always @(posedge clk) begin
+    if(~rst_n) counter <= 0;
+    else counter <= counter + 1;
+    t <= counter[23:8]; //offset
+  end
+  compute  #(
+    .IMG_SIZE(IMG_SIZE),
+    .MUL_FACTOR(MUL_FACTOR)
+  ) _compute (
+    .x(pix_x),
+    .y(pix_y),
+    .t(t),
+    .rst_n(rst_n),
+    .out(color)
+  );
+  
+  
   //assign color = img[mem_index]+img2[mem_index];
   assign R = (video_active)? color[5:4]:0;
   assign G = (video_active)? color[3:2]:0;
