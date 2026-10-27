@@ -26,7 +26,7 @@ pal_im.putpalette(palette)
 
 # nearest palette color (= rounding per channel) + Floyd-Steinberg dithering
 im = im.quantize(palette=pal_im, dither=Image.Dither.FLOYDSTEINBERG)
-data = im.getdata()
+data = im.get_flattened_data()
 
 with open(output_file, 'w') as f:
     for x in data:
