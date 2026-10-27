@@ -5,7 +5,7 @@
 
 parameter MAX_T = 640;  // maximum time of the transition
 
-module compute #(
+module compute_slide #(
     parameter IMG_SIZE = 320,  // number pixel per lines
     parameter MUL_FACTOR = 2   // vga_res/img_size
     // parameter DISPLAY_WIDTH = 320;  // VGA display width
@@ -48,7 +48,7 @@ module compute #(
     // assign y = yin;
 
     assign x = xin + counter;
-    assign y = yin + counter;
+    assign y = yin;
 
 
     wire[16:0] mem_index = (y / MUL_FACTOR) * IMG_SIZE + (x / MUL_FACTOR);  // read 6 bit at (y/2*320)
