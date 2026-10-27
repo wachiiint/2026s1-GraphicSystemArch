@@ -71,7 +71,7 @@ module tt_um_vga_example (
 
   reg [5:0] color;
 
-  compute_slide  #(
+  compute_fade  #(
     .IMG_SIZE(IMG_SIZE),
     .MUL_FACTOR(MUL_FACTOR)
   ) _compute (
