@@ -25,8 +25,9 @@ uv run image2hex.py <image_path> data/img.mem
 Start program
 - Run `npm start` in `vgaEngine/`
 - Open `localhost:5173` in browser
-- Change input on top right to gamepad mode
-- ....
+- The video transition will automaticly play
+- 2 option of transition: slide/fade \
+    change module name to match in `project.v:22`
 
 ## Demo
 -- 
