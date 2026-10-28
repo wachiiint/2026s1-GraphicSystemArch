@@ -19,7 +19,7 @@ Containing 5 projects for this semester
     - Difficult for user to type
     - Source code is in LAB2/code/project.v
     - See demo in [LAB2.md](./LAB2.md)
-3. [`LAB3-ImageTransition`] (https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab3)
+3. [`LAB3-ImageTransition`](https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab3)
     - Image transition like PowerPoint
     - Use the cutest creature in New Eridu as the model to display
     - Currently two sample transition mode: fade/slide
