@@ -1,0 +1,11 @@
+project:
+  title: "LAB1"
+  author: "Wachi-Effpy"
+  language: "Verilog"
+  clock_hz: 25175000
+  source_files:
+    - "gamepad_pmod.v"
+    - "hvsync_generator.v"
+    - "project.v"
+    - "sample.v"
+yaml_version: 6
