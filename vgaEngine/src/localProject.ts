@@ -1,9 +1,8 @@
 import { Project } from './examples/Project';
-import { extractReadmemPaths } from './github/loadProject';
 
 /**
- * Loads the Verilog files from the local `code/` directory (served by the
- * dev-only `/__code/files` endpoint in vite.config.js) as a Project.
+ * Loads the Verilog and .mem files of the selected lab (served by the
+ * dev-only `/__code/files` and `/__code/data` endpoints in vite.config.js) as a Project.
  * Returns null in production builds, or when `code/` has no source files.
  */
 export async function loadLocalProject(): Promise<Project | null> {
@@ -29,14 +28,9 @@ export async function loadLocalProject(): Promise<Project | null> {
         sources[name] = content;
       }
     }
-    // Fetch data files referenced via $readmemh/$readmemb, keyed by the literal path
-    const dataFiles: Record<string, string> = {};
-    for (const p of extractReadmemPaths(sources)) {
-      const dataRes = await fetch(`/__code/data?path=${encodeURIComponent(p)}`);
-      if (dataRes.ok) {
-        dataFiles[p] = await dataRes.text();
-      }
-    }
+    // All .mem files in dataPath, keyed by their path relative to compilePath
+    const dataRes = await fetch('/__code/data');
+    const dataFiles: Record<string, string> = dataRes.ok ? await dataRes.json() : {};
     return {
       id: 'local',
       name: 'My Project (code/)',

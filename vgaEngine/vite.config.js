@@ -5,11 +5,28 @@ import { defineConfig, loadEnv } from 'vite';
 
 const WORKSPACE_ROOT = fileURLToPath(new URL('..', import.meta.url));
 let CODE_DIR;
+let DATA_DIR;
 const isSourceFile = (name) => /^[\w.-]+\.s?v$/.test(name);
+const isDataFile = (name) => /^[\w.-]+\.mem$/.test(name);
+
+/** Read every matching file in `dir` into { keyOf(name): content }. */
+function readDir(dir, test, keyOf) {
+  const files = {};
+  if (fs.existsSync(dir)) {
+    for (const name of fs.readdirSync(dir)) {
+      if (test(name)) {
+        files[keyOf(name)] = fs.readFileSync(path.join(dir, name), 'utf8');
+      }
+    }
+  }
+  return files;
+}
 
 /**
- * Dev-only endpoint that exposes the local `code/` directory:
- *   GET /__code/files -> JSON map of { fileName: content }
+ * Dev-only endpoints that expose the selected lab (compilePath / dataPath in .env):
+ *   GET /__code/files -> JSON map of { fileName: content } from CODE_DIR
+ *   GET /__code/data  -> JSON map of { pathFromCodeDir: content } from DATA_DIR,
+ *                        keyed as $readmem sees it, e.g. "../data/img.mem"
  * Used by the app to load the local project as the default preset.
  */
 function serveCodeDir() {
@@ -19,28 +36,13 @@ function serveCodeDir() {
     configureServer(server) {
       server.middlewares.use('/__code', (req, res, next) => {
         if (req.method === 'GET' && req.url === '/files') {
-          const files = {};
-          if (fs.existsSync(CODE_DIR)) {
-            for (const name of fs.readdirSync(CODE_DIR)) {
-              if (isSourceFile(name)) {
-                files[name] = fs.readFileSync(path.join(CODE_DIR, name), 'utf8');
-              }
-            }
-          }
           res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify(files));
-        } else if (req.method === 'GET' && req.url.startsWith('/data?')) {
-          // GET /__code/data?path=<p> -> $readmem file, resolved relative to CODE_DIR
-          const rel = new URLSearchParams(req.url.slice('/data?'.length)).get('path') ?? '';
-          const file = path.resolve(CODE_DIR, rel);
-          const inWorkspace = !path.relative(WORKSPACE_ROOT, file).startsWith('..');
-          if (inWorkspace && fs.existsSync(file) && fs.statSync(file).isFile()) {
-            res.setHeader('Content-Type', 'text/plain');
-            res.end(fs.readFileSync(file, 'utf8'));
-          } else {
-            res.statusCode = 404;
-            res.end();
-          }
+          res.end(JSON.stringify(readDir(CODE_DIR, isSourceFile, (name) => name)));
+        } else if (req.method === 'GET' && req.url === '/data') {
+          const keyOf = (name) =>
+            path.relative(CODE_DIR, path.join(DATA_DIR, name)).split(path.sep).join('/');
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(readDir(DATA_DIR, isDataFile, keyOf)));
         } else {
           next();
         }
@@ -52,10 +54,12 @@ function serveCodeDir() {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, WORKSPACE_ROOT, '');
   const compilePath = env.compilePath || 'LAB1/code';
+  const dataPath = env.dataPath || path.join(path.dirname(compilePath), 'data');
   CODE_DIR = path.resolve(WORKSPACE_ROOT, compilePath);
+  DATA_DIR = path.resolve(WORKSPACE_ROOT, dataPath);
 
   if (fs.existsSync(CODE_DIR)) {
-    console.log(`[vgaEngine] compiling from ${compilePath}`);
+    console.log(`[vgaEngine] compiling from ${compilePath}, data from ${dataPath}`);
   } else {
     console.warn(
       `[vgaEngine] compilePath "${compilePath}" not found (${CODE_DIR}) — falling back to bundled examples`,

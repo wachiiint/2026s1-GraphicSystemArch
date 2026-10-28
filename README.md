@@ -22,7 +22,7 @@ Containing 5 projects for this semester
 3. [`LAB3-ImageTransition`] (https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab3)
     - Image transition like PowerPoint
     - Use the cutest creature in New Eridu as the model to display
-    - Select transition mode by __TBA__
+    - Currently two sample transition mode: fade/slide
 4. LAB4 — _TBD_
 5. LAB5 — _TBD_
 
@@ -53,11 +53,13 @@ note:
 browser only and are lost on refresh. Always edit in VSCode; use the web page
 just to run and view the game.
 
-## submit work
+## Submit work
+Push change into temporary branch which will never merge \
+This only contain one commit (the last snapshot)
 Set `compilePath`, `dataPath`, `exportBranch`, and `exportTitle` in `.env` for the lab you want to export (for example, `LAB1/code`, `LAB1/data`, `submit-lab1`, and `LAB1`). Replace `submit-lab3` below with that lab's branch name.
 
 ```
-chmod +x export.sh                     # make the script runnable
-./export.sh                            # build/replace the submit-lab3 branch locally
-git push -f origin submit-lab3         # upload it; -f because each export replaces the branch
+chmod +x export.sh
+./export.sh
+git push -f origin submit-lab3
 ```
