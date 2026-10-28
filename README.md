@@ -52,3 +52,11 @@ note:
 ⚠️ Edits made in the **web editor** are not saved to disk — they live in the
 browser only and are lost on refresh. Always edit in VSCode; use the web page
 just to run and view the game.
+
+## submit work
+```
+chmod +x export.sh                     # make the script runnable
+./export.sh                            # build/replace the submit-lab3 branch locally
+git push -f origin submit-lab3         # upload it; -f because each export replaces the branch
+```
+open via https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab3
