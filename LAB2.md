@@ -5,6 +5,9 @@ An ancient text editor with very not-intuative input \
 Inspired by pokemon essentials text input
 
 ## Manual
+[Open LAB2 in VGA Playground](https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab2), then select **Gamepad** input mode.
+
+To run locally:
 - Run `npm start` in `vgaEngine/`
 - Open `localhost:5173` in browser
 - Change input on top right to gamepad mode

@@ -9,12 +9,12 @@ Containing 5 projects for this semester
 2. Effpy: Passakorn Yangmak [\@Quackudy](https://github.com/Quackudy)
 
 ## Index
-1. [`LAB1-FlappyBird`]
+1. [`LAB1-FlappyBird`](https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab1)
     - A simple Flappy Bird game, press up arrow to fly
     - Hard coded plain graphic,
     - Source code is in LAB1/code/project.v
     - See demo in [LAB1.md](./LAB1.md)
-2. [`LAB2-TextEditor`]
+2. [`LAB2-TextEditor`](https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab2)
     - Simple logic to code
     - Difficult for user to type
     - Source code is in LAB2/code/project.v
@@ -54,6 +54,8 @@ browser only and are lost on refresh. Always edit in VSCode; use the web page
 just to run and view the game.
 
 ## submit work
+Set `compilePath`, `dataPath`, `exportBranch`, and `exportTitle` in `.env` for the lab you want to export (for example, `LAB1/code`, `LAB1/data`, `submit-lab1`, and `LAB1`). Replace `submit-lab3` below with that lab's branch name.
+
 ```
 chmod +x export.sh                     # make the script runnable
 ./export.sh                            # build/replace the submit-lab3 branch locally

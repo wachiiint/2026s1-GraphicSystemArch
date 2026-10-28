@@ -13,7 +13,10 @@ module tt_um_vga_example (
     output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
     input  wire       ena,      // always 1 when the design is powered, so you can ignore it
     input  wire       clk,      // clock
+    // Game logic resets asynchronously; the gamepad driver resets on clk.
+    /* verilator lint_off SYNCASYNCNET */
     input  wire       rst_n     // reset_n - low to reset
+    /* verilator lint_on SYNCASYNCNET */
 );
 
   // Unused outputs assigned to 0.
@@ -39,6 +42,7 @@ module tt_um_vga_example (
   // Gamepad Pmod
   wire inp_b, inp_y, inp_select, inp_start, inp_up, inp_down, inp_left, inp_right, inp_a, inp_x, inp_l, inp_r;
 
+  wire unused_is_present;
   gamepad_pmod_single driver (
       // Inputs:
       .rst_n(rst_n),
@@ -58,7 +62,8 @@ module tt_um_vga_example (
       .a(inp_a),
       .x(inp_x),
       .l(inp_l),
-      .r(inp_r)
+      .r(inp_r),
+      .is_present(unused_is_present)
   );
   
   localparam _G = 10'd3;
