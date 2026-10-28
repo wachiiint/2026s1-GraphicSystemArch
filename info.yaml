@@ -1,0 +1,11 @@
+project:
+  title: "LAB3"
+  author: "Wachi-Effpy"
+  language: "Verilog"
+  clock_hz: 25175000
+  source_files:
+    - "compute_fade.v"
+    - "compute_slide.v"
+    - "hvsync_generator.v"
+    - "project.v"
+yaml_version: 6
