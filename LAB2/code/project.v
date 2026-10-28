@@ -20,7 +20,7 @@ module tt_um_vga_example (
   assign uio_out = 0;
   assign uio_oe  = 0;
   // Suppress unused signals warning
-  wire _unused_ok = &{ena, ui_in[7], ui_in[4:0], uio_in};
+  wire _unused_ok = &{ena, ui_in[7], ui_in[4:0], uio_in, inp_select, inp_start, prevprev_pix_x};
 
   // VGA signals
   wire hsync;
@@ -47,6 +47,7 @@ module tt_um_vga_example (
   // Gamepad Pmod
   wire inp_b, inp_y, inp_select, inp_start, inp_up, inp_down, inp_left, inp_right, inp_a, inp_x, inp_l, inp_r;
 
+  wire unused_is_present;
   gamepad_pmod_single driver (
       // Inputs:
       .rst_n(rst_n),
@@ -66,14 +67,14 @@ module tt_um_vga_example (
       .a(inp_a),
       .x(inp_x),
       .l(inp_l),
-      .r(inp_r)
+      .r(inp_r),
+      .is_present(unused_is_present)
   );
 
   // Colors
   localparam [5:0] BLACK = {2'b00, 2'b00, 2'b00};
   localparam [5:0] GREEN = {2'b00, 2'b11, 2'b00};
   localparam [5:0] WHITE = {2'b11, 2'b11, 2'b11};
-  localparam [5:0] BLUE = {2'b00, 2'b00, 2'b11};
 
   ////// debounce //////
   reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_r, clean_inp_x, clean_inp_y;
@@ -199,7 +200,6 @@ module tt_um_vga_example (
       tr_to_write <= 0;
       selected_char <= 7'd65;
       char_ascii_w <= 7'd65;
-      cursor_is_on <= 1'b0;
       num_row_have_text <= 4'd0;
       for (i=0; i<=10; i = i+1) num_char_this_row[i] <= 6'd0;
     end else begin
