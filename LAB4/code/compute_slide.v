@@ -15,12 +15,11 @@ module compute_slide #(
 );
     localparam MAX_T = 650;  // maximum time of the transition
 
-    reg [5:0] img1[76799:0];  // 320x240 word, 1 word = 6 bit{R,G,B}
-    reg [5:0] img2[76799:0]; 
+    reg [5:0] img1[0:IMG_SIZE * 240 - 1];  // 320x240 word, 1 word = 6 bit{R,G,B}
+    //reg [5:0] img2[76799:0]; 
 
     initial begin
-        $readmemh("../data/img1.mem", img1);
-        $readmemh("../data/img2.mem", img2);
+        $readmemh("../data/img.mem", img1);
     end
 
     reg [16:0] counter;
@@ -40,15 +39,12 @@ module compute_slide #(
 
     //
     wire [11:0] x,y;
-    
-    // assign x = xin + counter;
-    // assign y = yin;
 
     assign x = xin + counter;
     assign y = yin;
 
 
     wire[16:0] mem_index = (y / MUL_FACTOR) * IMG_SIZE + (x / MUL_FACTOR);  // read 6 bit at (y/2*320)
-    assign out = x>= MAX_T ? img2[mem_index] : img1[mem_index];
+    assign out = img1[mem_index];
 
 endmodule
