@@ -23,8 +23,10 @@ Containing 5 projects for this semester
     - Image transition like PowerPoint
     - Use the cutest creature in New Eridu as the model to display
     - Currently two sample transition mode: fade/slide
-4. LAB4 — _TBD_
-5. LAB5 — _TBD_
+4. [`LAB4-ScrollingBackground`](https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab4)
+    - Scroll the background with the left and right arrows in **Gamepad** mode.
+5. [`LAB5-TilemapAndSprite`](https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab5)
+    - Two tilemap layers and a monster sprite; move with the left and right arrows in **Gamepad** mode.
 
 ## Project setup
 This workspace will run on localhost (Vite dev server, default http://localhost:5173) \
