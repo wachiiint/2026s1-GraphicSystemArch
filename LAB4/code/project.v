@@ -19,10 +19,6 @@
   color(x,y) = img[ y/MUL_FACTOR * IMG_SIZE + pix_x / MUL_FACTOR ]
   assign mem_index = (pix_y / MUL_FACTOR) * IMG_SIZE + pix_x / MUL_FACTOR;  // read 6 bit at (y/2*320)
 */
-parameter IMG_SIZE = 457;  // Source image width: img.mem words / 240
-parameter MUL_FACTOR = 2;   // vga_res/img_size
-parameter DISPLAY_WIDTH = 320;  // VGA display width
-parameter DISPLAY_HEIGHT = 240;  // VGA display height
 
 `define COLOR_WHITE 3'd7
 
@@ -37,11 +33,13 @@ module tt_um_vga_example (
     input  wire       rst_n     // reset_n - low to reset
 );
 
+  parameter IMG_SIZE = 457;  // Source image width: img.mem words / 240
+  parameter MUL_FACTOR = 2;   // vga_res/img_size
+  parameter DISPLAY_HEIGHT = 240;  // VGA display height
 
   // VGA signals
   wire hsync;
   wire vsync;
-  wire fsync;
   wire [1:0] R;
   wire [1:0] G;
   wire [1:0] B;
@@ -53,7 +51,8 @@ module tt_um_vga_example (
   assign uio_out = 0;
   assign uio_oe  = 0;
   // Suppress unused signals warning
-  wire _unused_ok = &{ena, ui_in[7], ui_in[4:0], uio_in};
+  wire _unused_ok = &{ena, ui_in[7], ui_in[4:0], uio_in,
+      inp_b, inp_y, inp_select, inp_start, inp_up, inp_down, inp_a, inp_x, inp_l, inp_r};
 
   // TinyVGA PMOD
   assign uo_out  = {hsync, B[0], G[0], R[0], vsync, B[1], G[1], R[1]};
@@ -71,6 +70,7 @@ module tt_um_vga_example (
   // Gamepad Pmod
   wire inp_b, inp_y, inp_select, inp_start, inp_up, inp_down, inp_left, inp_right, inp_a, inp_x, inp_l, inp_r;
 
+  wire unused_is_present;
   gamepad_pmod_single driver (
       // Inputs:
       .rst_n(rst_n),
@@ -90,38 +90,26 @@ module tt_um_vga_example (
       .a(inp_a),
       .x(inp_x),
       .l(inp_l),
-      .r(inp_r)
+      .r(inp_r),
+      .is_present(unused_is_present)
   );
   
-  ////// debounce //////
-  reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_r, clean_inp_x, clean_inp_y;
-  reg clean_inp_up, clean_inp_down, clean_inp_left, clean_inp_right;
-  debounce a_debounce (.clk(clk), .in(inp_a), .out(clean_inp_a));
-  debounce b_debounce (.clk(clk), .in(inp_b), .out(clean_inp_b));
-  debounce x_debounce (.clk(clk), .in(inp_x), .out(clean_inp_x));
-  debounce y_debounce (.clk(clk), .in(inp_y), .out(clean_inp_y));
-  debounce uu_debounce (.clk(clk), .in(inp_up), .out(clean_inp_up));
-  debounce dd_debounce (.clk(clk), .in(inp_down), .out(clean_inp_down));
+  wire clean_inp_left, clean_inp_right;
   debounce ll_debounce (.clk(clk), .in(inp_left), .out(clean_inp_left));
   debounce rr_debounce (.clk(clk), .in(inp_right), .out(clean_inp_right));
-  debounce l_debounce (.clk(clk), .in(inp_l), .out(clean_inp_l)); 
-  debounce r_debounce (.clk(clk), .in(inp_r), .out(clean_inp_r));
-  //////////////////////////
 
 
   reg [5:0] color;
   bg_render  #(
     .IMG_SIZE(IMG_SIZE),
     .MUL_FACTOR(MUL_FACTOR),
-    .DISPLAY_HEIGHT(DISPLAY_HEIGHT),
-    .DISPLAY_WIDTH(DISPLAY_WIDTH)
+    .DISPLAY_HEIGHT(DISPLAY_HEIGHT)
   ) rend1 (
     .xin(pix_x),
     .yin(pix_y),
     .clk(clk),
     .inp_l(clean_inp_left),
     .inp_r(clean_inp_right),
-    .video_active(video_active),
     .vsync(vsync),
     .rst_n(rst_n),
     .out(color)
