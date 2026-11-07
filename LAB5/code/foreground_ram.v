@@ -1,6 +1,6 @@
 `default_nettype none
 
-module map_rom (
+module foreground_ram (
     input wire clk,
     input wire vsync,
     input wire [9:0] addr, // {x[5:0], y[3:0]} in world tiles.
@@ -49,7 +49,7 @@ module map_rom (
       {6'd4,4'd9}, {6'd22,4'd9}: data <= 6'd9;
       {6'd5,4'd9}, {6'd23,4'd9}: data <= 6'd10;
       {6'd3,4'd10}, {6'd21,4'd10}: data <= 6'd19;
-      {6'd4,4'd10}, {6'd22,4'd10}: data <= 6'd20;
+      {6'd4,4'd10}, {6'd22,4'd10}: data <= 6'd7;
       {6'd5,4'd10}, {6'd23,4'd10}: data <= 6'd21;
       {6'd4,4'd11}, {6'd22,4'd11}: data <= 6'd18;
       {6'd4,4'd12}, {6'd22,4'd12}: data <= 6'd40;

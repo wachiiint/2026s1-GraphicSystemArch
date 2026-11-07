@@ -88,41 +88,52 @@ module tt_um_vga_example (
   //////////////////////////
 
   // Both layers use 16 pixels per row, each {opaque, R[1:0], G[1:0], B[1:0]}.
-  reg [111:0] tile_ram [0:703];
-  reg [111:0] background_rom [0:703];
-  wire [5:0] tile_id;
+  reg [111:0] foreground_tile_ram [0:703];
+  reg [111:0] background_tile_ram [0:703];
+  wire [5:0] foreground_tile_id, background_tile_id;
   reg [3:0] tile_row;
-  wire [9:0] tile_addr = {(tile_id == 6'd63 ? 6'd0 : tile_id), tile_row};
+  wire [9:0] foreground_tile_addr = {(foreground_tile_id == 6'd63 ? 6'd0 : foreground_tile_id), tile_row};
   reg foreground_present;
-  reg [111:0] tile_ram_output;
-  reg [111:0] background_rom_output;
-  wire [9:0] background_addr = {6'd39, tile_row}; // Blue background tile.
+  reg [111:0] foreground_tile_ram_output;
+  reg [111:0] background_tile_ram_output;
+  wire [9:0] background_tile_addr = {background_tile_id, tile_row}; // Blue background tile.
 
-  initial $readmemh("../data/tiny_tropical_tiles.mem", tile_ram);
-  initial $readmemh("../data/tiny_tropical_tiles.mem", background_rom);
+  initial $readmemh("../data/tiny_tropical_tiles.mem", foreground_tile_ram);
+  initial $readmemh("../data/tiny_tropical_tiles.mem", background_tile_ram);
 
-  reg [3:0] tile_col, prev_tile_col;
+  reg [3:0] foreground_tile_col, prev_foreground_tile_col;
+  reg [3:0] background_tile_col, prev_background_tile_col;
   reg prev_video_active, prevprev_video_active;
 
-  reg [9:0] x_offset;
-  wire [10:0] world_pix_x = {1'b0, pix_x} + {1'b0, x_offset}; // add one more bit to prevent not enough bit
-  wire [9:0] map_addr = {world_pix_x[10:5], pix_y[8:5]}; // change block every 32 pixel
+  reg [9:0] foreground_x_offset, background_x_offset;
+  wire [10:0] foreground_world_pix_x = {1'b0, pix_x} + {1'b0, foreground_x_offset};
+  wire [10:0] background_world_pix_x = {1'b0, pix_x} + {1'b0, background_x_offset};
+  wire [9:0] foreground_map_addr = {foreground_world_pix_x[10:5], pix_y[8:5]};
+  wire [9:0] background_map_addr = {background_world_pix_x[10:5], pix_y[8:5]};
 
-  map_rom map_rom_inst (
+  foreground_ram foreground_ram_inst (
     .clk(clk),
     .vsync(vsync),
-    .addr(map_addr),
-    .data(tile_id)
+    .addr(foreground_map_addr),
+    .data(foreground_tile_id)
+  );
+
+  background_ram background_ram_inst (
+    .clk(clk),
+    .vsync(vsync),
+    .addr(background_map_addr),
+    .data(background_tile_id)
   );
 
   always @(posedge clk) begin
-    // Map ROM takes one clock; tile RAM takes the next.
     tile_row <= pix_y[4:1];
-    tile_col <= world_pix_x[4:1];
-    prev_tile_col <= tile_col;
-    tile_ram_output <= tile_ram[tile_addr];
-    foreground_present <= tile_id != 6'd63;
-    background_rom_output <= background_rom[background_addr];
+    foreground_tile_col <= foreground_world_pix_x[4:1];
+    background_tile_col <= background_world_pix_x[4:1];
+    prev_foreground_tile_col <= foreground_tile_col;
+    prev_background_tile_col <= background_tile_col;
+    foreground_tile_ram_output <= foreground_tile_ram[foreground_tile_addr];
+    foreground_present <= foreground_tile_id != 6'd63;
+    background_tile_ram_output <= background_tile_ram[background_tile_addr];
   end
 
   always @(posedge clk or negedge rst_n) begin
@@ -142,26 +153,104 @@ module tt_um_vga_example (
   always @(posedge vsync or negedge rst_n) begin
     if (~rst_n) begin
       counter <= 10'd0;
-      x_offset <= 10'd0;
+      foreground_x_offset <= 10'd0;
+      background_x_offset <= 10'd0;
     end else begin
       counter <= counter + 10'd1;
-      if (counter[0] == 10'b0) begin
-        if (inp_left && x_offset > 10'd0)
-          x_offset <= x_offset - 10'd5;
-        else if (inp_right && x_offset < 10'd1023)
-          x_offset <= x_offset + 10'd5;
+      if (counter[0] == 1'b0) begin
+        if (inp_left && foreground_x_offset >= 10'd4) begin
+          foreground_x_offset <= foreground_x_offset - 10'd4;
+          background_x_offset <= background_x_offset - 10'd2;
+        end else if (inp_right && foreground_x_offset <= 10'd1016) begin
+          foreground_x_offset <= foreground_x_offset + 10'd4;
+          background_x_offset <= background_x_offset + 10'd2;
+        end
       end
     end
   end
 
 
-  wire [6:0] pixel_shift = (7'd15 - {3'd0, prev_tile_col}) * 7'd7;
-  wire [6:0] foreground_pixel = tile_ram_output[pixel_shift+:7];
-  wire [6:0] background_pixel = background_rom_output[pixel_shift+:7];
+  wire [6:0] foreground_pixel_shift = (7'd15 - {3'd0, prev_foreground_tile_col}) * 7'd7;
+  wire [6:0] background_pixel_shift = (7'd15 - {3'd0, prev_background_tile_col}) * 7'd7;
+  wire [6:0] foreground_pixel = foreground_tile_ram_output[foreground_pixel_shift+:7];
+  wire [6:0] background_pixel = background_tile_ram_output[background_pixel_shift+:7];
   wire [5:0] layered_color = (foreground_present && foreground_pixel[6]) ? foreground_pixel[5:0] :
                              background_pixel[6] ? background_pixel[5:0] : 6'd0;
+
+////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////
+
+  reg [9:0] monster_x, monster_y;
+  reg monster_prev_vsync;
+  reg monster_move_frame;
+  always @(posedge clk or negedge rst_n) begin
+    if (~rst_n) begin
+      monster_x <= 10'd10;
+      monster_y <= 10'd350;
+      monster_prev_vsync <= 1'b0;
+      monster_move_frame <= 1'b0;
+    end else begin
+      monster_prev_vsync <= vsync;
+      if (vsync && !monster_prev_vsync) begin
+        monster_move_frame <= ~monster_move_frame;
+        if (!monster_move_frame) begin
+          if (inp_right) begin
+            if (monster_x <= 10'd1021) monster_x <= monster_x + 10'd5;
+          end else if (inp_left) begin
+            if (monster_x >= 10'd2) monster_x <= monster_x - 10'd5;
+          end
+        end
+      end
+    end
+  end
+
+  reg [6:0] line_buffer_A [0:639];
+  reg [6:0] line_buffer_B [0:639];
+  wire curr_buff_active = pix_y[0];
+  reg [111:0] monster_ram [0:511];
+  initial $readmemh("../data/dude_monster.mem", monster_ram);
+
+  wire [10:0] next_y = pix_y == 10'd524 ? 11'd0 : {1'b0, pix_y} + 11'd1;
+  wire [10:0] monster_dx = foreground_world_pix_x - {1'b0, monster_x};
+  wire [10:0] monster_dy = next_y - {1'b0, monster_y};
+  wire monster_present = foreground_world_pix_x >= {1'b0, monster_x} &&
+                         monster_dx < 11'd32 && next_y >= {1'b0, monster_y} &&
+                         monster_dy < 11'd32;
+  wire [8:0] monster_word_selector = {5'd0, monster_dy[4:1]}; // Idle frame 0.
+  wire [6:0] monster_pixel_shift = (7'd15 - {3'd0, monster_dx[4:1]}) * 7'd7;
+  wire [6:0] monster_pixel = monster_present ?
+      monster_ram[monster_word_selector][monster_pixel_shift+:7] : 7'd0;
+  integer line_pixel;
+  reg [6:0] sprite_pixel, prev_sprite_pixel;
+
+  always @(posedge clk or negedge rst_n) begin
+    if (~rst_n) begin
+      for (line_pixel = 0; line_pixel < 640; line_pixel = line_pixel + 1) begin
+        line_buffer_A[line_pixel] = 7'd0;
+        line_buffer_B[line_pixel] = 7'd0;
+      end
+      sprite_pixel <= 0;
+      prev_sprite_pixel <= 0;
+    end else begin
+      sprite_pixel <= 0;
+      if (pix_x < 10'd640) begin
+        if (curr_buff_active) begin
+          sprite_pixel <= line_buffer_A[pix_x];
+          line_buffer_B[pix_x] <= monster_pixel;
+        end else begin
+          sprite_pixel <= line_buffer_B[pix_x];
+          line_buffer_A[pix_x] <= monster_pixel;
+        end
+      end
+      prev_sprite_pixel <= sprite_pixel;
+    end
+  end
+
+
   always @(*) begin
-    {R,G,B} = prevprev_video_active ? layered_color : 6'd0;
+    {R,G,B} = prevprev_video_active ?
+              (prev_sprite_pixel[6] ? prev_sprite_pixel[5:0] : layered_color) : 6'd0;
   end
   ////////////////////////////////////
 
