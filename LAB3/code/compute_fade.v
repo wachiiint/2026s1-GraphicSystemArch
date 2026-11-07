@@ -1,12 +1,4 @@
-`ifndef COMPUTE_H
-`define COMPUTE_H
-
 `default_nettype none
-
-parameter MAX_T = 196;      // maximum time of the transition
-parameter BLOCK = 16;       // block size 2^^n
-parameter BAND = 1;         // BAND of changing
-parameter T_SCALE = 4;      // TIME SCALING
 
 module compute_fade #(
     parameter IMG_SIZE = 320,  // number pixel per lines
@@ -21,10 +13,17 @@ module compute_fade #(
     input wire          rst_n,
     output wire [5:0]   out // color
 );
-    reg [5:0] img1[76799:0];  // 320x240 word, 1 word = 6 bit{R,G,B)
+    localparam MAX_T = 196;      // maximum time of the transition
+    localparam BLOCK = 16;       // block size
+    localparam BAND = 4;         // BAND of changing
+    localparam T_SCALE = 4;      // TIME SCALING
+
+    reg [5:0] img1[76799:0];  // 320x240 word, 1 word = 6 bit{R,G,B}
+    reg [5:0] img2[76799:0]; 
 
     initial begin
-        $readmemh("../data/img.mem", img1);
+        $readmemh("../data/img1.mem", img1);
+        $readmemh("../data/img2.mem", img2);
     end
 
     reg [15:0] counter;
@@ -44,7 +43,6 @@ module compute_fade #(
     /*
     do the math equation without always block
     tick + 1 when for each complete render loop
-    avg FPS = 45
     fade by manhuttan distance from mid right (x0, y0)
     */
 
@@ -59,8 +57,7 @@ module compute_fade #(
 
     localparam x0 = 639 / BLOCK;
     localparam y0 = 239 / BLOCK;
-    wire[16:0] mem_index = (y / MUL_FACTOR) * IMG_SIZE + (x / MUL_FACTOR); 
-    wire [5:0] color = img1[mem_index];
+    wire[16:0] mem_index = (y / MUL_FACTOR) * IMG_SIZE + (x / MUL_FACTOR);
     
     assign dx = (xb > x0 ? xb-x0 : x0-xb) * 2 / 3; // from *0.667 cuz aspect ration 640x480 idk
     assign dy = yb > y0 ? yb-y0 : y0-yb;
@@ -74,9 +71,27 @@ module compute_fade #(
     if passing -> graining effect in chess pattern with GREY 333 for 2 bit color
     if passed -> negative image
     */
-    assign out =    in_pass ? ((x & 3'b100) ^ (y & 3'b100) ? color : GRAY): 
-                    is_pass ? ~color : color;
+    // wire [2:0] dt = tick - (dx+dy);
+    // wire [8:0] lerp = {
+    //     ((BAND - dt) * {1'b0, img1[mem_index][5:4]} + dt *{1'b0, img2[mem_index][5:4]}) / BAND,
+    //     ((BAND - dt) * {1'b0, img1[mem_index][3:2]} + dt *{1'b0, img2[mem_index][3:2]}) / BAND,
+    //     ((BAND - dt) * {1'b0, img1[mem_index][1:0]} + dt *{1'b0, img2[mem_index][1:0]}) / BAND
+    // };
+    wire [2:0] dt = tick - (dx+dy);   // 0..BAND-1 = img1 -> img2, logic apply only in_pass
+    wire [5:0] c1 = img1[mem_index];
+    wire [5:0] c2 = img2[mem_index];
+
+    function [1:0] mix(input [1:0] a, input [1:0] b, input [2:0] t);
+        mix = ((BAND - t) * a + t * b) / BAND;
+    endfunction
+
+    wire [5:0] lerp = { mix(c1[5:4], c2[5:4], dt),
+                        mix(c1[3:2], c2[3:2], dt),
+                        mix(c1[1:0], c2[1:0], dt) };
+
+    // assign out =    in_pass ? ((x & 3'b010) ^ (y & 3'b010) ? lerp : GRAY): 
+    //                 is_pass ? img2[mem_index] : img1[mem_index];
+    assign out =    in_pass ? lerp: 
+                    is_pass ? img2[mem_index] : img1[mem_index];
 
 endmodule
-
-`endif

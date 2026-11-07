@@ -1,9 +1,4 @@
-`ifndef COMPUTE_H
-`define COMPUTE_H
-
 `default_nettype none
-
-parameter MAX_T = 640;  // maximum time of the transition
 
 module compute_slide #(
     parameter IMG_SIZE = 320,  // number pixel per lines
@@ -18,12 +13,14 @@ module compute_slide #(
     input wire          rst_n,
     output wire [5:0]   out // color
 );
+    localparam MAX_T = 650;  // maximum time of the transition
+
     reg [5:0] img1[76799:0];  // 320x240 word, 1 word = 6 bit{R,G,B}
-    // reg [5:0] img2[76799:0]; 
+    reg [5:0] img2[76799:0]; 
 
     initial begin
-        $readmemh("../data/img.mem", img1);
-        // $readmemh("../data/img.mem", img2);
+        $readmemh("../data/img1.mem", img1);
+        $readmemh("../data/img2.mem", img2);
     end
 
     reg [16:0] counter;
@@ -52,8 +49,6 @@ module compute_slide #(
 
 
     wire[16:0] mem_index = (y / MUL_FACTOR) * IMG_SIZE + (x / MUL_FACTOR);  // read 6 bit at (y/2*320)
-    assign out = x>= MAX_T ? 0 : img1[mem_index];
+    assign out = x>= MAX_T ? img2[mem_index] : img1[mem_index];
 
 endmodule
-
-`endif

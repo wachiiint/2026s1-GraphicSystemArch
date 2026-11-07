@@ -7,7 +7,7 @@ Btw, using the cutest creature as a display model in the world. \
 (credit source image to [ZZZ Ellen EP](https://youtu.be/cK1ABiGuiG0?si=rPRwHuZNclKfR6ib))
 ## Dependencies
 ```
-uv init
+uv init --bare
 uv add pillow
 # source .venv/bin/activate
 ```
