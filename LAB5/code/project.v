@@ -150,9 +150,11 @@ module tt_um_vga_example (
   end
 
   reg [9:0] counter;
+  reg [2:0] walk_counter;
   always @(posedge vsync or negedge rst_n) begin
     if (~rst_n) begin
       counter <= 10'd0;
+      walk_counter <= 3'd0;
       foreground_x_offset <= 10'd0;
       background_x_offset <= 10'd0;
     end else begin
@@ -165,6 +167,13 @@ module tt_um_vga_example (
           foreground_x_offset <= foreground_x_offset + 10'd4;
           background_x_offset <= background_x_offset + 10'd2;
         end
+
+        if (walk_counter > 3'd4) begin
+          walk_counter <= 3'd0;
+        end else begin
+          walk_counter <= walk_counter + 3'd1;
+        end
+
       end
     end
   end
@@ -187,7 +196,7 @@ module tt_um_vga_example (
   always @(posedge clk or negedge rst_n) begin
     if (~rst_n) begin
       monster_x <= 10'd10;
-      monster_y <= 10'd350;
+      monster_y <= 10'd352;
       monster_prev_vsync <= 1'b0;
       monster_move_frame <= 1'b0;
     end else begin
@@ -215,14 +224,29 @@ module tt_um_vga_example (
   wire [10:0] monster_dx = foreground_world_pix_x - {1'b0, monster_x};
   wire [10:0] monster_dy = next_y - {1'b0, monster_y};
   wire monster_present = foreground_world_pix_x >= {1'b0, monster_x} &&
-                         monster_dx < 11'd32 && next_y >= {1'b0, monster_y} &&
-                         monster_dy < 11'd32;
-  wire [8:0] monster_word_selector = {5'd0, monster_dy[4:1]}; // Idle frame 0.
-  wire [6:0] monster_pixel_shift = (7'd15 - {3'd0, monster_dx[4:1]}) * 7'd7;
-  wire [6:0] monster_pixel = monster_present ?
-      monster_ram[monster_word_selector][monster_pixel_shift+:7] : 7'd0;
+                         monster_dx < 11'd64 && next_y >= {1'b0, monster_y} &&
+                         monster_dy < 11'd64;
+  ///wire [8:0] monster_word_selector = {5'd0, monster_dy[4:1]}; // Idle frame 0.
+  wire [6:0] monster_pixel_shift = (7'd15 - {3'd0, monster_dx[5:2]}) * 7'd7;
+  wire [6:0] monster_pixel_shift_reverse = ({3'd0, monster_dx[5:2]}) * 7'd7;
+  reg [6:0] monster_pixel; //= monster_present ?
+  //    monster_ram[monster_word_selector][monster_pixel_shift+:7] : 7'd0;
   integer line_pixel;
   reg [6:0] sprite_pixel, prev_sprite_pixel;
+  
+
+  always @(*) begin
+    if (monster_present) begin  
+      if (inp_right) begin
+        monster_pixel = monster_ram[{5'd8 + walk_counter, monster_dy[5:2]}][monster_pixel_shift+:7];
+      end else if (inp_left) begin
+        monster_pixel = monster_ram[{5'd8 + walk_counter, monster_dy[5:2]}][monster_pixel_shift_reverse+:7];
+      end
+      else monster_pixel = monster_ram[{5'd0, monster_dy[5:2]}][monster_pixel_shift+:7];
+    end else begin
+      monster_pixel = 7'd0;
+    end
+  end
 
   always @(posedge clk or negedge rst_n) begin
     if (~rst_n) begin
