@@ -197,21 +197,18 @@ module tt_um_vga_example (
 ///////////////////////////////////////////////////////////
 
   reg [9:0] monster_x, monster_y;
-  reg monster_prev_vsync;
-  reg monster_move_frame;
   reg signed [5:0] monster_velocity_y;
-  reg monster_prev_up, monster_jump_requested;
-  reg [2:0] floor_check_pending;
+  reg monster_prev_up;
   reg floor_contact;
   wire [10:0] monster_bottom = {1'b0, monster_y} + 11'd63;
   wire signed [11:0] monster_fall_y = $signed({2'b00, monster_y}) +
                                     $signed({{6{monster_velocity_y[5]}}, monster_velocity_y});
-  wire [10:0] floor_probe_y = monster_bottom + (floor_check_pending[1] ? 11'd1 : 11'd0);
+  wire [10:0] floor_probe_y = monster_bottom + 11'd1;
   wire [10:0] monster_left_x = {1'b0, monster_x} + 11'd15;
   wire [10:0] monster_middle_x = {1'b0, monster_x} + 11'd32;
   wire [10:0] monster_right_x = {1'b0, monster_x} + 11'd48;
   wire [5:0] floor_left_tile, floor_middle_tile, floor_right_tile;
-  wire [9:0] floor_top = {1'b0, monster_bottom[8:5], 5'd0};
+  wire [9:0] floor_top = {1'b0, floor_probe_y[8:5], 5'd0};
 
   foreground_ram floor_left_rom (
     .clk(clk), .vsync(vsync),
@@ -238,35 +235,22 @@ module tt_um_vga_example (
   endfunction
   wire floor_hit = is_floor(floor_left_tile) || is_floor(floor_middle_tile) || is_floor(floor_right_tile);
 
-  always @(posedge clk or negedge rst_n) begin
+  always @(posedge vsync or negedge rst_n) begin
     if (~rst_n) begin
       monster_x <= 10'd10;
       monster_y <= 10'd352;
-      monster_prev_vsync <= 1'b0;
-      monster_move_frame <= 1'b0;
       monster_velocity_y <= 6'sd0;
       monster_prev_up <= 1'b0;
-      monster_jump_requested <= 1'b0;
-      floor_check_pending <= 3'b0;
       floor_contact <= 1'b0;
     end else begin
-      monster_prev_vsync <= vsync;
-      floor_check_pending <= {floor_check_pending[1:0], vsync && !monster_prev_vsync};
-      if (floor_check_pending[1]) begin
-        floor_contact <= monster_velocity_y >= 6'sd0 && monster_bottom < 11'd512 && floor_hit;
-        if (monster_velocity_y >= 6'sd0 && monster_bottom < 11'd512 && floor_hit) begin
-          monster_y <= floor_top >= 10'd64 ? floor_top - 10'd64 : 10'd0;
-          monster_velocity_y <= 6'sd0;
-        end
-      end
-      if (floor_check_pending[2] && monster_velocity_y >= 6'sd0 &&
-          (floor_contact || (monster_bottom < 11'd511 && floor_hit))) begin
-        monster_velocity_y <= monster_jump_requested ? -6'sd12 : 6'sd0;
-        floor_contact <= !monster_jump_requested;
-      end
-      if (vsync && !monster_prev_vsync) begin
-        monster_prev_up <= inp_up;
-        monster_jump_requested <= inp_up && !monster_prev_up;
+      monster_prev_up <= inp_up;
+
+      if (monster_velocity_y >= 6'sd0 && floor_probe_y < 11'd512 && floor_hit) begin
+        monster_y <= floor_top >= 10'd64 ? floor_top - 10'd64 : 10'd0;
+        monster_velocity_y <= (inp_up && !monster_prev_up) ? -6'sd12 : 6'sd0;
+        floor_contact <= !(inp_up && !monster_prev_up);
+      end else begin
+        floor_contact <= 1'b0;
         if (monster_fall_y < 12'sd0) begin
           monster_y <= 10'd0;
           monster_velocity_y <= 6'sd0;
@@ -275,17 +259,15 @@ module tt_um_vga_example (
           if (monster_velocity_y < 6'sd16)
             monster_velocity_y <= monster_velocity_y + 6'sd1;
         end
-        monster_move_frame <= ~monster_move_frame;
-        if (!monster_move_frame) begin
-          if (inp_right) begin
-            if (monster_x <= 10'd1000) monster_x <= monster_x + 10'd5;
-          end else if (inp_left) begin
-            if (monster_x >= 10'd2) monster_x <= monster_x - 10'd5;
-          end
-        end
+      end
+      if (inp_right) begin
+        if (monster_x <= 10'd1000) monster_x <= monster_x + 10'd5;
+      end else if (inp_left) begin
+        if (monster_x >= 10'd2) monster_x <= monster_x - 10'd5;
       end
     end
   end
+
 
   reg [6:0] line_buffer_A [0:639];
   reg [6:0] line_buffer_B [0:639];
