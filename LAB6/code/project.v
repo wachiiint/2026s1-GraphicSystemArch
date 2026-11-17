@@ -94,6 +94,7 @@ module tt_um_vga_example (
   reg [3:0] tile_row;
   wire [9:0] foreground_tile_addr = {(foreground_tile_id == 6'd63 ? 6'd0 : foreground_tile_id), tile_row};
   reg foreground_present;
+  reg foreground_water;
   reg [111:0] foreground_tile_ram_output;
   reg [111:0] background_tile_ram_output;
   wire [9:0] background_tile_addr = {background_tile_id, tile_row}; // Blue background tile.
@@ -133,6 +134,8 @@ module tt_um_vga_example (
     prev_background_tile_col <= background_tile_col;
     foreground_tile_ram_output <= foreground_tile_ram[foreground_tile_addr];
     foreground_present <= foreground_tile_id != 6'd63;
+    foreground_water <= foreground_tile_id == 6'd4 || foreground_tile_id == 6'd5 ||
+                        foreground_tile_id == 6'd15 || foreground_tile_id == 6'd26 || foreground_tile_id == 6'd37;
     background_tile_ram_output <= background_tile_ram[background_tile_addr];
   end
 
@@ -150,15 +153,18 @@ module tt_um_vga_example (
   end
 
   reg [9:0] counter;
-  reg [2:0] walk_counter;
+  reg [2:0] walk_counter, jump_counter;
   always @(posedge vsync or negedge rst_n) begin
     if (~rst_n) begin
       counter <= 10'd0;
       walk_counter <= 3'd0;
+      jump_counter <= 3'd0;
       foreground_x_offset <= 10'd0;
       background_x_offset <= 10'd0;
     end else begin
       counter <= counter + 10'd1;
+      if (floor_contact) jump_counter <= 3'd0;
+      else if (counter[0] == 1'b0) jump_counter <= jump_counter + 3'd1;
       if (counter[0] == 1'b0) begin
         if (inp_left && foreground_x_offset >= 10'd4) begin
           foreground_x_offset <= foreground_x_offset - 10'd4;
@@ -193,11 +199,13 @@ module tt_um_vga_example (
   reg [9:0] monster_x, monster_y;
   reg monster_prev_vsync;
   reg monster_move_frame;
-  reg [4:0] monster_velocity_y;
+  reg signed [5:0] monster_velocity_y;
+  reg monster_prev_up, monster_jump_requested;
   reg [2:0] floor_check_pending;
   reg floor_contact;
   wire [10:0] monster_bottom = {1'b0, monster_y} + 11'd63;
-  wire [10:0] monster_fall_y = {1'b0, monster_y} + {6'd0, monster_velocity_y};
+  wire signed [11:0] monster_fall_y = $signed({2'b00, monster_y}) +
+                                    $signed({{6{monster_velocity_y[5]}}, monster_velocity_y});
   wire [10:0] floor_probe_y = monster_bottom + (floor_check_pending[1] ? 11'd1 : 11'd0);
   wire [10:0] monster_left_x = {1'b0, monster_x} + 11'd15;
   wire [10:0] monster_middle_x = {1'b0, monster_x} + 11'd32;
@@ -236,26 +244,37 @@ module tt_um_vga_example (
       monster_y <= 10'd352;
       monster_prev_vsync <= 1'b0;
       monster_move_frame <= 1'b0;
-      monster_velocity_y <= 5'd0;
+      monster_velocity_y <= 6'sd0;
+      monster_prev_up <= 1'b0;
+      monster_jump_requested <= 1'b0;
       floor_check_pending <= 3'b0;
       floor_contact <= 1'b0;
     end else begin
       monster_prev_vsync <= vsync;
-      // After movement, read the feet first, then the pixel directly underneath.
       floor_check_pending <= {floor_check_pending[1:0], vsync && !monster_prev_vsync};
       if (floor_check_pending[1]) begin
-        floor_contact <= monster_bottom < 11'd512 && floor_hit;
-        if (monster_bottom < 11'd512 && floor_hit) begin
+        floor_contact <= monster_velocity_y >= 6'sd0 && monster_bottom < 11'd512 && floor_hit;
+        if (monster_velocity_y >= 6'sd0 && monster_bottom < 11'd512 && floor_hit) begin
           monster_y <= floor_top >= 10'd64 ? floor_top - 10'd64 : 10'd0;
-          monster_velocity_y <= 5'd0;
+          monster_velocity_y <= 6'sd0;
         end
       end
-      if (floor_check_pending[2] && !floor_contact && monster_bottom < 11'd511 && floor_hit)
-        monster_velocity_y <= 5'd0;
+      if (floor_check_pending[2] && monster_velocity_y >= 6'sd0 &&
+          (floor_contact || (monster_bottom < 11'd511 && floor_hit))) begin
+        monster_velocity_y <= monster_jump_requested ? -6'sd12 : 6'sd0;
+        floor_contact <= !monster_jump_requested;
+      end
       if (vsync && !monster_prev_vsync) begin
-        monster_y <= monster_fall_y > 11'd1023 ? 10'd1023 : monster_fall_y[9:0];
-        if (monster_velocity_y < 5'd16)
-          monster_velocity_y <= monster_velocity_y + 5'd1;
+        monster_prev_up <= inp_up;
+        monster_jump_requested <= inp_up && !monster_prev_up;
+        if (monster_fall_y < 12'sd0) begin
+          monster_y <= 10'd0;
+          monster_velocity_y <= 6'sd0;
+        end else begin
+          monster_y <= monster_fall_y > 12'sd1023 ? 10'd1023 : monster_fall_y[9:0];
+          if (monster_velocity_y < 6'sd16)
+            monster_velocity_y <= monster_velocity_y + 6'sd1;
+        end
         monster_move_frame <= ~monster_move_frame;
         if (!monster_move_frame) begin
           if (inp_right) begin
@@ -271,7 +290,7 @@ module tt_um_vga_example (
   reg [6:0] line_buffer_A [0:639];
   reg [6:0] line_buffer_B [0:639];
   wire curr_buff_active = pix_y[0];
-  // 32x32 source frames, displayed at 2x scale (64x64).
+  // 32*32 source frames, display at x2 (64*64).
   reg [223:0] monster_ram [0:1023];
   initial $readmemh("../data/dude_monster_full.mem", monster_ram);
 
@@ -283,19 +302,24 @@ module tt_um_vga_example (
                          monster_dy < 11'd64;
   wire [7:0] monster_pixel_shift = (8'd31 - {3'd0, monster_dx[5:1]}) * 8'd7;
   wire [7:0] monster_pixel_shift_reverse = {3'd0, monster_dx[5:1]} * 8'd7;
+  reg [4:0] monster_frame;
   reg [6:0] monster_pixel;
   integer line_pixel;
   reg [6:0] sprite_pixel, prev_sprite_pixel;
   
 
   always @(*) begin
+    if (!floor_contact) monster_frame = 5'd24 + {2'd0, jump_counter};
+    else if (inp_right || inp_left) monster_frame = 5'd8 + {2'd0, walk_counter};
+    else monster_frame = 5'd0;
+
     if (monster_present) begin  
       if (inp_right) begin
-        monster_pixel = monster_ram[{5'd8 + {2'd0, walk_counter}, monster_dy[5:1]}][monster_pixel_shift+:7];
+        monster_pixel = monster_ram[{monster_frame, monster_dy[5:1]}][monster_pixel_shift+:7];
       end else if (inp_left) begin
-        monster_pixel = monster_ram[{5'd8 + {2'd0, walk_counter}, monster_dy[5:1]}][monster_pixel_shift_reverse+:7];
+        monster_pixel = monster_ram[{monster_frame, monster_dy[5:1]}][monster_pixel_shift_reverse+:7];
       end
-      else monster_pixel = monster_ram[{5'd0, monster_dy[5:1]}][monster_pixel_shift+:7];
+      else monster_pixel = monster_ram[{monster_frame, monster_dy[5:1]}][monster_pixel_shift+:7];
     end else begin
       monster_pixel = 7'd0;
     end
@@ -325,9 +349,11 @@ module tt_um_vga_example (
   end
 
 
+  wire water_in_front = foreground_present && foreground_water && foreground_pixel[6];
   always @(*) begin
     {R,G,B} = prevprev_video_active ?
-              (prev_sprite_pixel[6] ? prev_sprite_pixel[5:0] : layered_color) : 6'd0;
+              (water_in_front ? foreground_pixel[5:0] :
+               prev_sprite_pixel[6] ? prev_sprite_pixel[5:0] : layered_color) : 6'd0;
   end
   ////////////////////////////////////
 

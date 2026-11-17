@@ -56,6 +56,13 @@ module foreground_ram (
 
       {6'd1,4'd12}, {6'd9,4'd12}, {6'd17,4'd12}: data <= 6'd30;
       {6'd7,4'd12}, {6'd25,4'd12}, {6'd28,4'd12}: data <= 6'd41;
+
+      // Closed-bottom platforms, each 64 pixels above the previous surface.
+      {6'd6,4'd11}, {6'd10,4'd9}, {6'd14,4'd7}: data <= 6'd1;
+      {6'd7,4'd11}, {6'd8,4'd11},
+      {6'd11,4'd9}, {6'd12,4'd9},
+      {6'd15,4'd7}, {6'd16,4'd7}: data <= 6'd2;
+      {6'd9,4'd11}, {6'd13,4'd9}, {6'd17,4'd7}: data <= 6'd3;
       default: ;
     endcase
 
