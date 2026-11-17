@@ -176,84 +176,129 @@ module tt_um_vga_example (
   reg [9:0] monster_x, monster_y;
   reg monster_prev_vsync;
   reg monster_move_frame;
+  reg face_left; // keep facing after release
   always @(posedge clk or negedge rst_n) begin
     if (~rst_n) begin
       monster_x <= 10'd10;
       monster_y <= 10'd352;
       monster_prev_vsync <= 1'b0;
       monster_move_frame <= 1'b0;
+      face_left <= 1'b0;
     end else begin
       monster_prev_vsync <= vsync;
+      if (inp_left) face_left <= 1'b1;
+      else if (inp_right) face_left <= 1'b0;
       if (vsync && !monster_prev_vsync) begin
         monster_move_frame <= ~monster_move_frame;
         if (!monster_move_frame) begin
           if (inp_right) begin
-            if (monster_x <= 10'd1021) monster_x <= monster_x + 10'd5;
+            if (monster_x <= 10'd1018) monster_x <= monster_x + 10'd5;
           end else if (inp_left) begin
-            if (monster_x >= 10'd2) monster_x <= monster_x - 10'd5;
+            if (monster_x >= 10'd5) monster_x <= monster_x - 10'd5;
           end
         end
       end
     end
   end
 
-  reg [6:0] line_buffer_A [0:639];
-  reg [6:0] line_buffer_B [0:639];
-  wire curr_buff_active = pix_y[0];
-  reg [111:0] monster_ram [0:511];
+  ////// sprites //////
+  // triple line buffer, line y: show = y%3, draw (line y+1) = (y+1)%3, clear = (y+2)%3
+  // 525 lines = 3*175 -> y%3 stays in sync across frames
+  reg [6:0] lb0 [0:639];
+  reg [6:0] lb1 [0:639];
+  reg [6:0] lb2 [0:639];
+  reg [1:0] sel; // = pix_y % 3
+  reg [111:0] monster_ram [0:511]; // 32 frames * 16 rows, row = 16 px * 7 bit
   initial $readmemh("../data/dude_monster.mem", monster_ram);
 
-  wire [10:0] next_y = pix_y == 10'd524 ? 11'd0 : {1'b0, pix_y} + 11'd1;
-  wire [10:0] monster_dx = fg_pix_x - {1'b0, monster_x};
-  wire [10:0] monster_dy = next_y - {1'b0, monster_y};
-  wire monster_present = fg_pix_x >= {1'b0, monster_x} &&
-                         monster_dx < 11'd64 && next_y >= {1'b0, monster_y} &&
-                         monster_dy < 11'd64;
-  ///wire [8:0] monster_word_selector = {5'd0, monster_dy[4:1]}; // Idle frame 0.
-  wire [6:0] monster_pixel_shift = (7'd15 - {3'd0, monster_dx[5:2]}) * 7'd7;
-  wire [6:0] monster_pixel_shift_reverse = ({3'd0, monster_dx[5:2]}) * 7'd7;
-  reg [6:0] monster_pixel; //= monster_present ?
-  //    monster_ram[monster_word_selector][monster_pixel_shift+:7] : 7'd0;
-  integer line_pixel;
-  reg [6:0] sprite_pixel, prev_sprite_pixel;
-  
+  wire [9:0] draw_y = (pix_y == 10'd524) ? 10'd0 : pix_y + 10'd1;
 
+  // sprite table, last = on top
+  localparam N_SPR = 3'd4;
+  reg [2:0] i;
+  reg [10:0] spr_x; // world x
+  reg [9:0] spr_y;
+  reg [4:0] spr_frame; // sheet row*8 + col: idle 0-3, walk 8-13
+  reg spr_flip;
+  wire moving = inp_left || inp_right;
   always @(*) begin
-    if (monster_present) begin  
-      if (inp_right) begin
-        monster_pixel = monster_ram[{5'd8 + walk_counter, monster_dy[5:2]}][monster_pixel_shift+:7];
-      end else if (inp_left) begin
-        monster_pixel = monster_ram[{5'd8 + walk_counter, monster_dy[5:2]}][monster_pixel_shift_reverse+:7];
-      end
-      else monster_pixel = monster_ram[{5'd0, monster_dy[5:2]}][monster_pixel_shift+:7];
-    end else begin
-      monster_pixel = 7'd0;
-    end
+    case (i)
+      3'd0: {spr_x, spr_y, spr_frame, spr_flip} = {11'd250, 10'd352, 3'd0, walk_counter[1:0], 1'b0};
+      3'd1: {spr_x, spr_y, spr_frame, spr_flip} = {11'd600, 10'd352, 3'd0, walk_counter[1:0], 1'b1};
+      3'd2: {spr_x, spr_y, spr_frame, spr_flip} = {11'd900, 10'd352, 3'd0, walk_counter[1:0], 1'b0};
+      default: {spr_x, spr_y, spr_frame, spr_flip} = // player
+        {1'b0, monster_x, monster_y, moving ? 5'd8 + {2'd0, walk_counter} : {3'd0, walk_counter[1:0]}, face_left};
+    endcase
   end
+
+  // sprite i vs draw_y, 64x64 on screen (16x16 art * 4)
+  wire [9:0]  dy = draw_y - spr_y; // < 64 -> hit (negative wraps big)
+  wire [11:0] sx = {1'b0, spr_x} - {2'b0, fg_x_offset}; // screen x, can be negative
+  wire hit = dy < 10'd64 && (sx + 12'd64) < 12'd704; // in line + on screen
+
+  // FSM: render all sprites of line y+1 into draw buffer
+  localparam IDLE = 2'd0, FOR_I = 2'd1, WRITE = 2'd2;
+  reg [1:0] state;
+  reg [111:0] spr_row;
+  reg [11:0] cur_sx;
+  reg cur_flip;
+  reg [5:0] dx;
+  wire [3:0]  spr_col = cur_flip ? 4'd15 - dx[5:2] : dx[5:2];
+  wire [6:0]  wpx = spr_row[111 - spr_col*7 -: 7];
+  wire [11:0] wx  = cur_sx + {6'd0, dx};
+  wire we = state == WRITE && wpx[6] && wx < 12'd640; // opaque + on screen
 
   always @(posedge clk or negedge rst_n) begin
     if (~rst_n) begin
-      for (line_pixel = 0; line_pixel < 640; line_pixel = line_pixel + 1) begin
-        line_buffer_A[line_pixel] = 7'd0;
-        line_buffer_B[line_pixel] = 7'd0;
-      end
-      sprite_pixel <= 0;
-      prev_sprite_pixel <= 0;
+      state <= IDLE;
+      sel <= 2'd0;
     end else begin
-      sprite_pixel <= 0;
-      if (pix_x < 10'd640) begin
-        if (curr_buff_active) begin
-          sprite_pixel <= line_buffer_A[pix_x];
-          line_buffer_B[pix_x] <= monster_pixel;
-        end else begin
-          sprite_pixel <= line_buffer_B[pix_x];
-          line_buffer_A[pix_x] <= monster_pixel;
+      if (pix_x == 10'd799) sel <= (sel == 2'd2) ? 2'd0 : sel + 2'd1;
+      case (state)
+        IDLE: if (pix_x == 10'd0 && draw_y < 10'd480) begin
+          i <= 3'd0;
+          state <= FOR_I;
         end
-      end
-      prev_sprite_pixel <= sprite_pixel;
+        FOR_I: if (i == N_SPR) state <= IDLE;
+          else if (hit) begin
+            spr_row <= monster_ram[{spr_frame, dy[5:2]}]; // ready next clk
+            cur_sx <= sx;
+            cur_flip <= spr_flip;
+            dx <= 6'd0;
+            state <= WRITE;
+          end else i <= i + 3'd1;
+        WRITE: begin
+          dx <= dx + 6'd1;
+          if (dx == 6'd63) begin
+            i <= i + 3'd1;
+            state <= FOR_I;
+          end
+        end
+        default: state <= IDLE;
+      endcase
     end
   end
 
+  // buffers: clear + draw + read in parallel
+  reg [6:0] sprite_pixel, prev_sprite_pixel;
+  always @(posedge clk) begin
+    if (pix_x < 10'd640) case (sel) // clear
+      2'd0: lb2[pix_x] <= 7'd0;
+      2'd1: lb0[pix_x] <= 7'd0;
+      default: lb1[pix_x] <= 7'd0;
+    endcase
+    if (we) case (sel) // draw
+      2'd0: lb1[wx[9:0]] <= wpx;
+      2'd1: lb2[wx[9:0]] <= wpx;
+      default: lb0[wx[9:0]] <= wpx;
+    endcase
+    case (sel) // show
+      2'd0: sprite_pixel <= lb0[pix_x];
+      2'd1: sprite_pixel <= lb1[pix_x];
+      default: sprite_pixel <= lb2[pix_x];
+    endcase
+    prev_sprite_pixel <= sprite_pixel; // t+2, match tiles
+  end
 
   always @(*) begin
     {R,G,B} = prevprev_video_active ?
