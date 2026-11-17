@@ -73,68 +73,68 @@ module tt_um_vga_example (
 
 
   ////// debounce //////
-  reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_r, clean_inp_x, clean_inp_y;
-  reg clean_inp_up, clean_inp_down, clean_inp_left, clean_inp_right;
-  debounce a_debounce (.clk(clk), .in(inp_a), .out(clean_inp_a));
-  debounce b_debounce (.clk(clk), .in(inp_b), .out(clean_inp_b));
-  debounce x_debounce (.clk(clk), .in(inp_x), .out(clean_inp_x));
-  debounce y_debounce (.clk(clk), .in(inp_y), .out(clean_inp_y));
-  debounce uu_debounce (.clk(clk), .in(inp_up), .out(clean_inp_up));
-  debounce dd_debounce (.clk(clk), .in(inp_down), .out(clean_inp_down));
-  debounce ll_debounce (.clk(clk), .in(inp_left), .out(clean_inp_left));
-  debounce rr_debounce (.clk(clk), .in(inp_right), .out(clean_inp_right));
-  debounce l_debounce (.clk(clk), .in(inp_l), .out(clean_inp_l)); 
-  debounce r_debounce (.clk(clk), .in(inp_r), .out(clean_inp_r));
+  // reg clean_inp_a, clean_inp_b, clean_inp_l, clean_inp_r, clean_inp_x, clean_inp_y;
+  // reg clean_inp_up, clean_inp_down, clean_inp_left, clean_inp_right;
+  // debounce a_debounce (.clk(clk), .in(inp_a), .out(clean_inp_a));
+  // debounce b_debounce (.clk(clk), .in(inp_b), .out(clean_inp_b));
+  // debounce x_debounce (.clk(clk), .in(inp_x), .out(clean_inp_x));
+  // debounce y_debounce (.clk(clk), .in(inp_y), .out(clean_inp_y));
+  // debounce uu_debounce (.clk(clk), .in(inp_up), .out(clean_inp_up));
+  // debounce dd_debounce (.clk(clk), .in(inp_down), .out(clean_inp_down));
+  // debounce ll_debounce (.clk(clk), .in(inp_left), .out(clean_inp_left));
+  // debounce rr_debounce (.clk(clk), .in(inp_right), .out(clean_inp_right));
+  // debounce l_debounce (.clk(clk), .in(inp_l), .out(clean_inp_l)); 
+  // debounce r_debounce (.clk(clk), .in(inp_r), .out(clean_inp_r));
   //////////////////////////
 
-  // Both layers use 16 pixels per row, each {opaque, R[1:0], G[1:0], B[1:0]}.
-  reg [111:0] foreground_tile_ram [0:703];
-  reg [111:0] background_tile_ram [0:703];
-  wire [5:0] foreground_tile_id, background_tile_id;
-  reg [3:0] tile_row;
-  wire [9:0] foreground_tile_addr = {(foreground_tile_id == 6'd63 ? 6'd0 : foreground_tile_id), tile_row};
-  reg foreground_present;
-  reg [111:0] foreground_tile_ram_output;
-  reg [111:0] background_tile_ram_output;
-  wire [9:0] background_tile_addr = {background_tile_id, tile_row}; // Blue background tile.
+  ////// tile layers //////
+  /*
+  Tile = 16x16 art drawn 2x -> 32x32 on screen.
+  3 steps, 1 clock each:  t: map address  ->  t+1: tile id  ->  t+2: pixel
+  Tile ROM, shared by both layers: 44 tiles x 16 rows.
+  One entry = one tile row = 16 px x 7 bit {opaque, R[1:0], G[1:0], B[1:0]}.
+  */
+  reg [111:0] tile_rom [0:703]; //112 = 16(#col per tile)*7(color), 704 = 44(#tile) * 16 (#row per tile)
+  initial $readmemh("../data/tiny_tropical_tiles.mem", tile_rom);
 
-  initial $readmemh("../data/tiny_tropical_tiles.mem", foreground_tile_ram);
-  initial $readmemh("../data/tiny_tropical_tiles.mem", background_tile_ram);
-
-  reg [3:0] foreground_tile_col, prev_foreground_tile_col;
-  reg [3:0] background_tile_col, prev_background_tile_col;
+  reg [9:0] fg_x_offset, bg_x_offset;
   reg prev_video_active, prevprev_video_active;
 
-  reg [9:0] foreground_x_offset, background_x_offset;
-  wire [10:0] foreground_world_pix_x = {1'b0, pix_x} + {1'b0, foreground_x_offset};
-  wire [10:0] background_world_pix_x = {1'b0, pix_x} + {1'b0, background_x_offset};
-  wire [9:0] foreground_map_addr = {foreground_world_pix_x[10:5], pix_y[8:5]};
-  wire [9:0] background_map_addr = {background_world_pix_x[10:5], pix_y[8:5]};
+  // step t: screen pixel -> world pixel -> map address {tile_x, tile_y} (5+4 bit)
+  wire [10:0] fg_pix_x = {1'b0, pix_x} + {1'b0, fg_x_offset}; // current pixel + offset
+  wire [10:0] bg_pix_x = {1'b0, pix_x} + {1'b0, bg_x_offset};
+  wire [9:0] fg_map_addr = {fg_pix_x[10:5], pix_y[8:5]}; // map of tile_id in (x,y) {fg_pix_x /16, pix_y / 16} (5+4 = 9 bit)
+  wire [9:0] bg_map_addr = {bg_pix_x[10:5], pix_y[8:5]};
 
-  foreground_ram foreground_ram_inst (
-    .clk(clk),
-    .vsync(vsync),
-    .addr(foreground_map_addr),
-    .data(foreground_tile_id)
-  );
+  // step t+1: look up map_addr in rom -> get tile_id
+  wire [5:0] fg_tile_id, bg_tile_id;
+  foreground_ram foreground_ram_inst (.clk(clk), .vsync(vsync), .addr(fg_map_addr), .data(fg_tile_id));
+  background_ram background_ram_inst (.clk(clk), .vsync(vsync), .addr(bg_map_addr), .data(bg_tile_id));
 
-  background_ram background_ram_inst (
-    .clk(clk),
-    .vsync(vsync),
-    .addr(background_map_addr),
-    .data(background_tile_id)
-  );
-
+  reg [3:0] row; // row to render in art pixel, obtain from real pix_x in fg, bg
+  reg [3:0] fg_col, bg_col;
   always @(posedge clk) begin
-    tile_row <= pix_y[4:1];
-    foreground_tile_col <= foreground_world_pix_x[4:1];
-    background_tile_col <= background_world_pix_x[4:1];
-    prev_foreground_tile_col <= foreground_tile_col;
-    prev_background_tile_col <= background_tile_col;
-    foreground_tile_ram_output <= foreground_tile_ram[foreground_tile_addr];
-    foreground_present <= foreground_tile_id != 6'd63;
-    background_tile_ram_output <= background_tile_ram[background_tile_addr];
+    row    <= pix_y[4:1]; // 2x scale up 16*16 -> 32*32
+    fg_col <= fg_pix_x[4:1];
+    bg_col <= bg_pix_x[4:1];
   end
+
+  // step t+2: tile ROM gives one row of 16 px (1 clock late) ----
+  reg [111:0] fg_row, bg_row;
+  reg [3:0] fg_col_d, bg_col_d;   // column, delayed again to match the ROM
+  reg fg_present;
+  always @(posedge clk) begin
+    fg_row   <= tile_rom[{(fg_tile_id == 6'd63) ? 6'd0 : fg_tile_id, row}]; // 63 = empty, keep address in range
+    bg_row   <= tile_rom[{bg_tile_id, row}];
+    fg_col_d <= fg_col;
+    bg_col_d <= bg_col;
+    fg_present <= fg_tile_id !=  6'd63; // delaying
+  end
+
+  // pick 1 pixel from the row (column 0 = most significant 7 bits)
+  wire [6:0] fg_pixel = fg_row[111 - fg_col_d*7 -: 7]; // same as  [111 - fg_col_d*7 : 111 - fg_col_d*7 - 7]
+  wire [6:0] bg_pixel = bg_row[111 - bg_col_d*7 -: 7];
+  //////////////////////////
 
   always @(posedge clk or negedge rst_n) begin
     if (~rst_n) begin
@@ -155,19 +155,18 @@ module tt_um_vga_example (
     if (~rst_n) begin
       counter <= 10'd0;
       walk_counter <= 3'd0;
-      foreground_x_offset <= 10'd0;
-      background_x_offset <= 10'd0;
+      fg_x_offset <= 10'd0;
+      bg_x_offset <= 10'd0;
     end else begin
       counter <= counter + 10'd1;
       if (counter[0] == 1'b0) begin
-        if (inp_left && foreground_x_offset >= 10'd4) begin
-          foreground_x_offset <= foreground_x_offset - 10'd4;
-          background_x_offset <= background_x_offset - 10'd2;
-        end else if (inp_right && foreground_x_offset <= 10'd1016) begin
-          foreground_x_offset <= foreground_x_offset + 10'd4;
-          background_x_offset <= background_x_offset + 10'd2;
+        if (inp_left && fg_x_offset >= 10'd4) begin
+          fg_x_offset <= fg_x_offset - 10'd4;
+          bg_x_offset <= bg_x_offset - 10'd2;
+        end else if (inp_right && fg_x_offset <= 10'd1016) begin
+          fg_x_offset <= fg_x_offset + 10'd4;
+          bg_x_offset <= bg_x_offset + 10'd2;
         end
-
         if (walk_counter > 3'd4) begin
           walk_counter <= 3'd0;
         end else begin
@@ -179,12 +178,8 @@ module tt_um_vga_example (
   end
 
 
-  wire [6:0] foreground_pixel_shift = (7'd15 - {3'd0, prev_foreground_tile_col}) * 7'd7;
-  wire [6:0] background_pixel_shift = (7'd15 - {3'd0, prev_background_tile_col}) * 7'd7;
-  wire [6:0] foreground_pixel = foreground_tile_ram_output[foreground_pixel_shift+:7];
-  wire [6:0] background_pixel = background_tile_ram_output[background_pixel_shift+:7];
-  wire [5:0] layered_color = (foreground_present && foreground_pixel[6]) ? foreground_pixel[5:0] :
-                             background_pixel[6] ? background_pixel[5:0] : 6'd0;
+  wire [5:0] layered_color = (fg_present && fg_pixel[6]) ? fg_pixel[5:0] : // 63 = transparent
+                             bg_pixel[6] ? bg_pixel[5:0] : 6'd0;
 
 ////////////////////////////////////////////////////////////
 
@@ -221,9 +216,9 @@ module tt_um_vga_example (
   initial $readmemh("../data/dude_monster.mem", monster_ram);
 
   wire [10:0] next_y = pix_y == 10'd524 ? 11'd0 : {1'b0, pix_y} + 11'd1;
-  wire [10:0] monster_dx = foreground_world_pix_x - {1'b0, monster_x};
+  wire [10:0] monster_dx = fg_pix_x - {1'b0, monster_x};
   wire [10:0] monster_dy = next_y - {1'b0, monster_y};
-  wire monster_present = foreground_world_pix_x >= {1'b0, monster_x} &&
+  wire monster_present = fg_pix_x >= {1'b0, monster_x} &&
                          monster_dx < 11'd64 && next_y >= {1'b0, monster_y} &&
                          monster_dy < 11'd64;
   ///wire [8:0] monster_word_selector = {5'd0, monster_dy[4:1]}; // Idle frame 0.

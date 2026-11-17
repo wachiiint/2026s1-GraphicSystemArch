@@ -4,7 +4,7 @@ module background_ram (
     input wire clk,
     input wire vsync,
     input wire [9:0] addr, // {x[5:0], y[3:0]} in world tiles.
-    output reg [5:0] data
+    output reg [5:0] data  // output = tile_id
 );
   wire [5:0] x = addr[9:4];
   wire [3:0] y = addr[3:0];
