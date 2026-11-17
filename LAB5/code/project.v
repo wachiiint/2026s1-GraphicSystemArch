@@ -88,52 +88,40 @@ module tt_um_vga_example (
   //////////////////////////
 
   ////// tile layers //////
-  /*
-  Tile = 16x16 art drawn 2x -> 32x32 on screen.
-  3 steps, 1 clock each:  t: map address  ->  t+1: tile id  ->  t+2: pixel
-  Tile ROM, shared by both layers: 44 tiles x 16 rows.
-  One entry = one tile row = 16 px x 7 bit {opaque, R[1:0], G[1:0], B[1:0]}.
-  */
-  reg [111:0] tile_rom [0:703]; //112 = 16(#col per tile)*7(color), 704 = 44(#tile) * 16 (#row per tile)
+  // t: map addr -> t+1: tile id -> t+2: pixel
+  reg [111:0] tile_rom [0:703]; // 112 = 16(#col per tile)*7(color), 704 = 44(#tile) * 16 (#row per tile)
   initial $readmemh("../data/tiny_tropical_tiles.mem", tile_rom);
 
   reg [9:0] fg_x_offset, bg_x_offset;
   reg prev_video_active, prevprev_video_active;
 
-  // step t: screen pixel -> world pixel -> map address {tile_x, tile_y} (5+4 bit)
-  wire [10:0] fg_pix_x = {1'b0, pix_x} + {1'b0, fg_x_offset}; // current pixel + offset
-  wire [10:0] bg_pix_x = {1'b0, pix_x} + {1'b0, bg_x_offset};
-  wire [9:0] fg_map_addr = {fg_pix_x[10:5], pix_y[8:5]}; // map of tile_id in (x,y) {fg_pix_x /16, pix_y / 16} (5+4 = 9 bit)
-  wire [9:0] bg_map_addr = {bg_pix_x[10:5], pix_y[8:5]};
+  // t
+  wire [10:0] fg_pix_x = pix_x + fg_x_offset; // current pixel + offset
+  wire [10:0] bg_pix_x = pix_x + bg_x_offset;
 
-  // step t+1: look up map_addr in rom -> get tile_id
+  // t+1: {x/32, y/32} -> tile_id
   wire [5:0] fg_tile_id, bg_tile_id;
-  foreground_ram foreground_ram_inst (.clk(clk), .vsync(vsync), .addr(fg_map_addr), .data(fg_tile_id));
-  background_ram background_ram_inst (.clk(clk), .vsync(vsync), .addr(bg_map_addr), .data(bg_tile_id));
+  foreground_ram fg_map (.clk(clk), .vsync(vsync), .addr({fg_pix_x[10:5], pix_y[8:5]}), .data(fg_tile_id));
+  background_ram bg_map (.clk(clk), .vsync(vsync), .addr({bg_pix_x[10:5], pix_y[8:5]}), .data(bg_tile_id));
 
-  reg [3:0] row; // row to render in art pixel, obtain from real pix_x in fg, bg
-  reg [3:0] fg_col, bg_col;
-  always @(posedge clk) begin
-    row    <= pix_y[4:1]; // 2x scale up 16*16 -> 32*32
-    fg_col <= fg_pix_x[4:1];
-    bg_col <= bg_pix_x[4:1];
-  end
+  wire fg_present_next = fg_tile_id != 6'd63; // 63 = empty
 
-  // step t+2: tile ROM gives one row of 16 px (1 clock late) ----
+  reg [3:0] row;
+  reg [7:0] col, col_d; // {fg_col, bg_col}
   reg [111:0] fg_row, bg_row;
-  reg [3:0] fg_col_d, bg_col_d;   // column, delayed again to match the ROM
   reg fg_present;
   always @(posedge clk) begin
-    fg_row   <= tile_rom[{(fg_tile_id == 6'd63) ? 6'd0 : fg_tile_id, row}]; // 63 = empty, keep address in range
-    bg_row   <= tile_rom[{bg_tile_id, row}];
-    fg_col_d <= fg_col;
-    bg_col_d <= bg_col;
-    fg_present <= fg_tile_id !=  6'd63; // delaying
+    // t+1
+    row   <= pix_y[4:1]; // 2x scale up 16*16 -> 32*32
+    col   <= {fg_pix_x[4:1], bg_pix_x[4:1]};
+    // t+2
+    col_d <= col; // delaying
+    fg_row <= tile_rom[{fg_present_next ? fg_tile_id : 6'd0, row}]; // keep address in range
+    bg_row <= tile_rom[{bg_tile_id, row}];
+    fg_present <= fg_present_next;
   end
-
-  // pick 1 pixel from the row (column 0 = most significant 7 bits)
-  wire [6:0] fg_pixel = fg_row[111 - fg_col_d*7 -: 7]; // same as  [111 - fg_col_d*7 : 111 - fg_col_d*7 - 7]
-  wire [6:0] bg_pixel = bg_row[111 - bg_col_d*7 -: 7];
+  wire [6:0] fg_pixel = fg_row[111 - col_d[7:4]*7 -: 7]; // col 0 = MSB
+  wire [6:0] bg_pixel = bg_row[111 - col_d[3:0]*7 -: 7];
   //////////////////////////
 
   always @(posedge clk or negedge rst_n) begin
