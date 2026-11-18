@@ -1,0 +1,13 @@
+project:
+  title: "LAB5"
+  author: "Wachi-Effpy"
+  language: "Verilog"
+  clock_hz: 25175000
+  source_files:
+    - "background_ram.v"
+    - "debounce.v"
+    - "foreground_ram.v"
+    - "gamepad_pmod.v"
+    - "hvsync_generator.v"
+    - "project.v"
+yaml_version: 6
