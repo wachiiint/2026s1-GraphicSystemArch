@@ -2,7 +2,7 @@
 
 ## Description
 This is a part of Graphical System Architecture \
-Containing 5 projects for this semester
+Containing 6 projects for this semester
 
 ## Group member
 1. Wachi: Wachiraphut Intarachart [\@wachiiint](https://github.com/wachiiint)
@@ -27,6 +27,8 @@ Containing 5 projects for this semester
     - Scroll the background with the left and right arrows in **Gamepad** mode.
 5. [`LAB5-TilemapAndSprite`](https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab5)
     - Two tilemap layers and a monster sprite; move with the left and right arrows in **Gamepad** mode.
+6. [`LAB6-FloorCollision`](https://vga-playground.com/?repo=https://github.com/wachiiint/2026s1-GraphicSystemArch&ref=submit-lab6)
+    - Move with the left and right arrows and jump with the up arrow in **Gamepad** mode; land on tilemap platforms.
 
 ## Project setup
 This workspace will run on localhost (Vite dev server, default http://localhost:5173) \
